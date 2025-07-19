@@ -407,3 +407,4 @@ FodyWeavers.xsd
 # Genie
 .genie/
 GEMINI.md
+.env
