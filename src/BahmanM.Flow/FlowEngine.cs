@@ -96,6 +96,19 @@ public class FlowEngine
         };
     }
 
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(ChainNode<TIn, TOut> node)
+    {
+        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+
+        if (upstreamOutcome is not Success<TIn> success)
+        {
+            return Outcome.Failure<TOut>(((Failure<TIn>)upstreamOutcome).Exception);
+        }
+
+        var nextFlow = (IFlowNode<TOut>)node.Operation(success.Value);
+        return await nextFlow.ExecuteWith(this);
+    }
+
     #endregion
 
     #region Private Helpers
