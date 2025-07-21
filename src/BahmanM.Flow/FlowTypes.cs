@@ -1,13 +1,47 @@
 namespace BahmanM.Flow;
 
-internal sealed record SucceededFlow<T>(T Value) : IFlow<T>;
+#region Internal Flow AST Nodes
 
-internal sealed record FailedFlow<T>(Exception Exception) : IFlow<T>;
+#region Source
 
-internal sealed record CreateFlow<T>(Func<T> Operation) : IFlow<T>;
+internal sealed record SucceededFlow<T>(T Value) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
 
-internal sealed record AsyncCreateFlow<T>(Func<Task<T>> Operation) : IFlow<T>;
+internal sealed record FailedFlow<T>(Exception Exception) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
 
-internal sealed record DoOnSuccessFlow<T>(IFlow<T> Upstream, Action<T> Action) : IFlow<T>;
+#endregion
 
-internal sealed record AsyncDoOnSuccessFlow<T>(IFlow<T> Upstream, Func<T, Task> AsyncAction) : IFlow<T>;
+#region Create
+
+internal sealed record CreateFlow<T>(Func<T> Operation) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
+
+internal sealed record AsyncCreateFlow<T>(Func<Task<T>> Operation) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
+
+#endregion
+
+#region DoOnSuccess
+
+internal sealed record DoOnSuccessFlow<T>(IFlow<T> Upstream, Action<T> Action) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
+
+internal sealed record AsyncDoOnSuccessFlow<T>(IFlow<T> Upstream, Func<T, Task> AsyncAction) : IVisitableFlow<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+}
+
+#endregion
+
+#endregion
