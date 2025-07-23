@@ -5,6 +5,7 @@ namespace BahmanM.Flow;
 internal interface IFlowNode<T> : IFlow<T>
 {
     Task<Outcome<T>> ExecuteWith(FlowEngine engine);
+    IFlow<T> Apply(IBehaviourStrategy strategy);
 }
 
 #endregion
@@ -16,11 +17,13 @@ internal interface IFlowNode<T> : IFlow<T>
 internal sealed record SucceededNode<T>(T Value) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 internal sealed record FailedNode<T>(Exception Exception) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 #endregion
@@ -30,11 +33,13 @@ internal sealed record FailedNode<T>(Exception Exception) : IFlowNode<T>
 internal sealed record CreateNode<T>(Func<T> Operation) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 internal sealed record AsyncCreateNode<T>(Func<Task<T>> Operation) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 #endregion
@@ -44,11 +49,13 @@ internal sealed record AsyncCreateNode<T>(Func<Task<T>> Operation) : IFlowNode<T
 internal sealed record DoOnSuccessNode<T>(IFlow<T> Upstream, Action<T> Action) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 internal sealed record AsyncDoOnSuccessNode<T>(IFlow<T> Upstream, Func<T, Task> AsyncAction) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 #endregion
@@ -58,13 +65,14 @@ internal sealed record AsyncDoOnSuccessNode<T>(IFlow<T> Upstream, Func<T, Task> 
 internal sealed record SelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, TOut> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 internal sealed record AsyncSelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, Task<TOut>> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
-
 
 #endregion
 
@@ -73,11 +81,13 @@ internal sealed record AsyncSelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn,
 internal sealed record ChainNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, IFlow<TOut>> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 internal sealed record AsyncChainNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, Task<IFlow<TOut>>> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
 #endregion
