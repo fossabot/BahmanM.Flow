@@ -72,6 +72,32 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
+    internal async Task<Outcome<T>> Execute<T>(DoOnFailureNode<T> node)
+    {
+        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+
+        if (upstreamOutcome is Failure<T> failure)
+        {
+            try { node.Action(failure.Exception); }
+            catch { /* Ignore */ }
+        }
+
+        return upstreamOutcome;
+    }
+
+    internal async Task<Outcome<T>> Execute<T>(AsyncDoOnFailureNode<T> node)
+    {
+        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+
+        if (upstreamOutcome is Failure<T> failure)
+        {
+            try { await node.AsyncAction(failure.Exception); }
+            catch { /* Ignore */ }
+        }
+
+        return upstreamOutcome;
+    }
+
     internal async Task<Outcome<TOut>> Execute<TIn, TOut>(SelectNode<TIn, TOut> node)
     {
         var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
