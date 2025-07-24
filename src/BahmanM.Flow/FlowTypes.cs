@@ -108,4 +108,20 @@ internal sealed record AsyncChainNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, 
 
 #endregion
 
+#region Concurrency Nodes
+
+internal sealed record AllNode<T>(IReadOnlyList<IFlow<T>> Flows) : IFlowNode<T[]>
+{
+    public Task<Outcome<T[]>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T[]> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record AnyNode<T>(IReadOnlyList<IFlow<T>> Flows) : IFlowNode<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+#endregion
+
 #endregion

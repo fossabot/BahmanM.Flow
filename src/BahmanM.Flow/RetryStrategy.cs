@@ -98,5 +98,8 @@ internal class RetryStrategy : IBehaviourStrategy
         return node with { Operation = newOperation };
     }
 
+    public IFlow<T[]> ApplyTo<T>(AllNode<T> node) => node;
+    public IFlow<T> ApplyTo<T>(AnyNode<T> node) => node;
+
     #endregion
 }
