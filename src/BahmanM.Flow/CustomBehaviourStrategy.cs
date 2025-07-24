@@ -1,0 +1,17 @@
+namespace BahmanM.Flow;
+
+internal class CustomBehaviourStrategy(IBehaviour behaviour) : IBehaviourStrategy
+{
+    public IFlow<T> ApplyTo<T>(SucceededNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(FailedNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(CreateNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(AsyncCreateNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(DoOnSuccessNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(AsyncDoOnSuccessNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(DoOnFailureNode<T> node) => behaviour.Apply(node);
+    public IFlow<T> ApplyTo<T>(AsyncDoOnFailureNode<T> node) => behaviour.Apply(node);
+    public IFlow<TOut> ApplyTo<TIn, TOut>(SelectNode<TIn, TOut> node) => behaviour.Apply(node);
+    public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncSelectNode<TIn, TOut> node) => behaviour.Apply(node);
+    public IFlow<TOut> ApplyTo<TIn, TOut>(ChainNode<TIn, TOut> node) => behaviour.Apply(node);
+    public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncChainNode<TIn, TOut> node) => behaviour.Apply(node);
+}
