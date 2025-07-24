@@ -20,7 +20,6 @@ public class DoOnFailureTests
             capturedException = ex;
         };
 
-
         var flow = Flow.Fail<string>(ZenosException).DoOnFailure(onFailure);
 
         // Act
@@ -28,7 +27,7 @@ public class DoOnFailureTests
 
         // Assert
         Assert.True(actionCalled);
-        Assert.Same(ZenosException, capturedException);
+        Assert.Equal(ZenosException, capturedException);
         Assert.Equal(Failure<string>(ZenosException), outcome);
     }
 
@@ -83,7 +82,7 @@ public class DoOnFailureTests
 
         // Assert
         Assert.True(actionCalled);
-        Assert.Same(ZenosException, capturedException);
+        Assert.Equal(ZenosException, capturedException);
         Assert.Equal(Failure<string>(ZenosException), outcome);
     }
 

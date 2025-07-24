@@ -178,7 +178,7 @@ public class FlowEngine
 
     internal async Task<Outcome<T>> Execute<T>(AnyNode<T> node)
     {
-        return await ExecuteAnyRecursively(
+        return await TryFindFirstSuccessfulFlow(
             node.Flows.Select(f => ((IFlowNode<T>)f).ExecuteWith(this)).ToList(),
             []);
     }
@@ -187,7 +187,7 @@ public class FlowEngine
 
     #region Private Helpers
 
-    private async Task<Outcome<T>> ExecuteAnyRecursively<T>(List<Task<Outcome<T>>> remainingTasks, List<Exception> exceptions)
+    private async Task<Outcome<T>> TryFindFirstSuccessfulFlow<T>(List<Task<Outcome<T>>> remainingTasks, List<Exception> exceptions)
     {
         if (remainingTasks is [])
         {
@@ -207,7 +207,7 @@ public class FlowEngine
         }
 
         exceptions.Add(((Failure<T>)outcome).Exception);
-        return await ExecuteAnyRecursively(remainingTasks, exceptions);
+        return await TryFindFirstSuccessfulFlow(remainingTasks, exceptions);
     }
 
     private static Task<Outcome<T>> TryOperation<T>(Func<T> operation)
