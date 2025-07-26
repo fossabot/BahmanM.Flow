@@ -12,7 +12,7 @@ internal class RetryStrategy : IBehaviourStrategy
             ? maxAttempts
             : throw new ArgumentOutOfRangeException(nameof(maxAttempts), "Max attempts must be a positive integer.");
     }
-    
+
     public RetryStrategy(int maxAttempts) : this(maxAttempts, [typeof(TimeoutException)])
     {
     }
@@ -21,14 +21,12 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<T> ApplyTo<T>(SucceededNode<T> node) => node;
     public IFlow<T> ApplyTo<T>(FailedNode<T> node) => node;
-
     public IFlow<T> ApplyTo<T>(CancellableAsyncCreateNode<T> node)
     {
         throw new NotImplementedException();
     }
 
     public IFlow<T> ApplyTo<T>(DoOnSuccessNode<T> node) => node;
-
     public IFlow<T> ApplyTo<T>(AsyncDoOnSuccessNode<T> node) => node;
     public IFlow<T> ApplyTo<T>(CancellableAsyncDoOnSuccessNode<T> node)
     {
@@ -36,19 +34,17 @@ internal class RetryStrategy : IBehaviourStrategy
     }
 
     public IFlow<T> ApplyTo<T>(DoOnFailureNode<T> node) => node;
-
     public IFlow<T> ApplyTo<T>(AsyncDoOnFailureNode<T> node) => node;
+    public IFlow<T> ApplyTo<T>(CancellableAsyncDoOnFailureNode<T> node) => node;
 
     public IFlow<TOut> ApplyTo<TIn, TOut>(SelectNode<TIn, TOut> node) => node;
-
     public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncSelectNode<TIn, TOut> node) => node;
-
     public IFlow<TOut> ApplyTo<TIn, TOut>(CancellableAsyncSelectNode<TIn, TOut> node) => node;
 
     #endregion
 
     #region Rewriting Implementations
-    
+
     public IFlow<T> ApplyTo<T>(CreateNode<T> node)
     {
         Operations.Create.Sync<T> newOperation = () =>
@@ -62,7 +58,7 @@ internal class RetryStrategy : IBehaviourStrategy
                 }
                 catch (Exception ex)
                 {
-                    if (_nonRetryableExceptions.Contains(ex.GetType())) 
+                    if (_nonRetryableExceptions.Contains(ex.GetType()))
                         throw;
                     lastException = ex;
                 }
@@ -92,7 +88,7 @@ internal class RetryStrategy : IBehaviourStrategy
                 }
                 catch (Exception ex)
                 {
-                    if (_nonRetryableExceptions.Contains(ex.GetType())) 
+                    if (_nonRetryableExceptions.Contains(ex.GetType()))
                         throw;
                     lastException = ex;
                 }
@@ -117,6 +113,7 @@ internal class RetryStrategy : IBehaviourStrategy
     }
 
     public IFlow<T[]> ApplyTo<T>(AllNode<T> node) => node;
+
     public IFlow<T> ApplyTo<T>(AnyNode<T> node) => node;
 
     #endregion
