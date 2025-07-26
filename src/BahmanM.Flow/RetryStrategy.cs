@@ -1,3 +1,5 @@
+using BahmanM.Flow.Ast.Primitive;
+
 namespace BahmanM.Flow;
 
 internal class RetryStrategy : IBehaviourStrategy
@@ -19,8 +21,8 @@ internal class RetryStrategy : IBehaviourStrategy
 
     #region Pass-through Implementations
 
-    public IFlow<T> ApplyTo<T>(Ast.Pure.Succeed<T> node) => node;
-    public IFlow<T> ApplyTo<T>(Ast.Pure.Fail<T> node) => node;
+    public IFlow<T> ApplyTo<T>(Succeed<T> node) => node;
+    public IFlow<T> ApplyTo<T>(Fail<T> node) => node;
     public IFlow<T> ApplyTo<T>(Ast.Create.CancellableAsync<T> node)
     {
         throw new NotImplementedException();
