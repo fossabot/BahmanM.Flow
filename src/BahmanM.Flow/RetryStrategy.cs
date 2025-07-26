@@ -43,6 +43,8 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncSelectNode<TIn, TOut> node) => node;
 
+    public IFlow<TOut> ApplyTo<TIn, TOut>(CancellableAsyncSelectNode<TIn, TOut> node) => node;
+
     #endregion
 
     #region Rewriting Implementations
