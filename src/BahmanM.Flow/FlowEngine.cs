@@ -6,13 +6,13 @@ public class FlowEngine
 
     public static Task<Outcome<T>> ExecuteAsync<T>(IFlow<T> flow)
     {
-        var node = (IFlowNode<T>)flow;
+        var node = (Ast.INode<T>)flow;
         return node.ExecuteWith(new FlowEngine());
     }
 
     public static Task<Outcome<T>> ExecuteAsync<T>(IFlow<T> flow, FlowExecutionOptions options)
     {
-        var node = (IFlowNode<T>)flow;
+        var node = (Ast.INode<T>)flow;
         return node.ExecuteWith(new FlowEngine(options));
     }
 
@@ -38,25 +38,25 @@ public class FlowEngine
 
     #region Visitor Methods
 
-    internal Task<Outcome<T>> Execute<T>(SucceededNode<T> node) =>
+    internal Task<Outcome<T>> Execute<T>(Ast.Pure.Succeed<T> node) =>
         Task.FromResult(Outcome.Success(node.Value));
 
-    internal Task<Outcome<T>> Execute<T>(FailedNode<T> node) =>
+    internal Task<Outcome<T>> Execute<T>(Ast.Pure.Fail<T> node) =>
         Task.FromResult(Outcome.Failure<T>(node.Exception));
 
-    internal Task<Outcome<T>> Execute<T>(CreateNode<T> node) =>
+    internal Task<Outcome<T>> Execute<T>(Ast.Create.Sync<T> node) =>
         TryOperation.TrySync<T>(() => node.Operation());
 
-    internal Task<Outcome<T>> Execute<T>(AsyncCreateNode<T> node) =>
+    internal Task<Outcome<T>> Execute<T>(Ast.Create.Async<T> node) =>
         TryOperation.TryAsync<T>(() => node.Operation());
 
-    internal Task<Outcome<T>> Execute<T>(CancellableAsyncCreateNode<T> node) =>
+    internal Task<Outcome<T>> Execute<T>(Ast.Create.CancellableAsync<T> node) =>
         TryOperation.TryCancellableAsync<T>((cancellationToken) => node.Operation(cancellationToken),
             CancellationToken);
 
-    internal async Task<Outcome<T>> Execute<T>(DoOnSuccessNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnSuccess.Sync<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Success<T> success)
         {
@@ -74,9 +74,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<T>> Execute<T>(AsyncDoOnSuccessNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnSuccess.Async<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Success<T> success)
         {
@@ -94,9 +94,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<T>> Execute<T>(CancellableAsyncDoOnSuccessNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnSuccess.CancellableAsync<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Success<T> success)
         {
@@ -114,9 +114,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<T>> Execute<T>(DoOnFailureNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnFailure.Sync<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Failure<T> failure)
         {
@@ -133,9 +133,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<T>> Execute<T>(AsyncDoOnFailureNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnFailure.Async<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Failure<T> failure)
         {
@@ -152,9 +152,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<T>> Execute<T>(CancellableAsyncDoOnFailureNode<T> node)
+    internal async Task<Outcome<T>> Execute<T>(Ast.DoOnFailure.CancellableAsync<T> node)
     {
-        var upstreamOutcome = await ((IFlowNode<T>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<T>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is Failure<T> failure)
         {
@@ -171,9 +171,9 @@ public class FlowEngine
         return upstreamOutcome;
     }
 
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(SelectNode<TIn, TOut> node)
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Select.Sync<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         return upstreamOutcome switch
         {
@@ -183,9 +183,9 @@ public class FlowEngine
         };
     }
 
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(AsyncSelectNode<TIn, TOut> node)
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Select.Async<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         return upstreamOutcome switch
         {
@@ -195,9 +195,9 @@ public class FlowEngine
         };
     }
 
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(CancellableAsyncSelectNode<TIn, TOut> node)
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Select.CancellableAsync<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         return upstreamOutcome switch
         {
@@ -207,9 +207,9 @@ public class FlowEngine
         };
     }
 
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(ChainNode<TIn, TOut> node)
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Chain.Sync<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is not Success<TIn> success)
         {
@@ -218,7 +218,7 @@ public class FlowEngine
 
         try
         {
-            var nextFlow = (IFlowNode<TOut>)node.Operation(success.Value);
+            var nextFlow = (Ast.INode<TOut>)node.Operation(success.Value);
             return await nextFlow.ExecuteWith(this);
         }
         catch (Exception ex)
@@ -227,9 +227,9 @@ public class FlowEngine
         }
     }
 
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(AsyncChainNode<TIn, TOut> node)
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Chain.Async<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is not Success<TIn> success)
         {
@@ -238,7 +238,7 @@ public class FlowEngine
 
         try
         {
-            var nextFlow = (IFlowNode<TOut>)await node.Operation(success.Value);
+            var nextFlow = (Ast.INode<TOut>)await node.Operation(success.Value);
             return await nextFlow.ExecuteWith(this);
         }
         catch (Exception ex)
@@ -246,10 +246,10 @@ public class FlowEngine
             return Outcome.Failure<TOut>(ex);
         }
     }
-    
-    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(CancellableAsyncChainNode<TIn, TOut> node)
+
+    internal async Task<Outcome<TOut>> Execute<TIn, TOut>(Ast.Chain.CancellableAsync<TIn, TOut> node)
     {
-        var upstreamOutcome = await ((IFlowNode<TIn>)node.Upstream).ExecuteWith(this);
+        var upstreamOutcome = await ((Ast.INode<TIn>)node.Upstream).ExecuteWith(this);
 
         if (upstreamOutcome is not Success<TIn> success)
         {
@@ -263,7 +263,7 @@ public class FlowEngine
                 return Outcome.Failure<TOut>(new TaskCanceledException());
             }
 
-            var nextFlow = (IFlowNode<TOut>)await node.Operation(success.Value, CancellationToken);
+            var nextFlow = (Ast.INode<TOut>)await node.Operation(success.Value, CancellationToken);
             return await nextFlow.ExecuteWith(this);
         }
         catch (Exception ex)
@@ -272,12 +272,12 @@ public class FlowEngine
         }
     }
 
-    internal async Task<Outcome<T[]>> Execute<T>(AllNode<T> node)
+    internal async Task<Outcome<T[]>> Execute<T>(Ast.Primitive.All<T> node)
     {
         // This implementation waits for all flows to complete. If any have failed, it
         // aggregates all their exceptions. This provides the most comprehensive diagnostic
         // information to the caller, rather than failing fast on the first exception.
-        var outcomes = await Task.WhenAll(node.Flows.Select(f => ((IFlowNode<T>)f).ExecuteWith(this)));
+        var outcomes = await Task.WhenAll(node.Flows.Select(f => ((Ast.INode<T>)f).ExecuteWith(this)));
 
         var exceptions = outcomes.OfType<Failure<T>>().Select(f => f.Exception).ToList();
 
@@ -286,9 +286,9 @@ public class FlowEngine
             : Outcome.Success(outcomes.OfType<Success<T>>().Select(s => s.Value).ToArray());
     }
 
-    internal async Task<Outcome<T>> Execute<T>(AnyNode<T> node) =>
+    internal async Task<Outcome<T>> Execute<T>(Ast.Primitive.Any<T> node) =>
         await TryOperation.TryFindFirstSuccessfulFlow<T>(
-            node.Flows.Select(f => ((IFlowNode<T>)f).ExecuteWith(this)).ToList(),
+            node.Flows.Select(f => ((Ast.INode<T>)f).ExecuteWith(this)).ToList(),
             []);
 
 #endregion
