@@ -30,13 +30,19 @@ internal sealed record FailedNode<T>(Exception Exception) : IFlowNode<T>
 
 #region Create Nodes
 
-internal sealed record CreateNode<T>(Func<T> Operation) : IFlowNode<T>
+internal sealed record CreateNode<T>(Operations.Create.Sync<T> Operation) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
-internal sealed record AsyncCreateNode<T>(Func<Task<T>> Operation) : IFlowNode<T>
+internal sealed record AsyncCreateNode<T>(Operations.Create.Async<T> Operation) : IFlowNode<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record CancellableAsyncCreateNode<T>(Operations.Create.CancellableAsync<T> Operation) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
@@ -46,13 +52,21 @@ internal sealed record AsyncCreateNode<T>(Func<Task<T>> Operation) : IFlowNode<T
 
 #region DoOnSuccess Nodes
 
-internal sealed record DoOnSuccessNode<T>(IFlow<T> Upstream, Action<T> Action) : IFlowNode<T>
+internal sealed record DoOnSuccessNode<T>(IFlow<T> Upstream, Operations.DoOnSuccess.Sync<T> Action) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
-internal sealed record AsyncDoOnSuccessNode<T>(IFlow<T> Upstream, Func<T, Task> AsyncAction) : IFlowNode<T>
+internal sealed record AsyncDoOnSuccessNode<T>(IFlow<T> Upstream, Operations.DoOnSuccess.Async<T> AsyncAction) : IFlowNode<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record CancellableAsyncDoOnSuccessNode<T>(
+    IFlow<T> Upstream,
+    Operations.DoOnSuccess.CancellableAsync<T> AsyncAction) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
@@ -62,13 +76,21 @@ internal sealed record AsyncDoOnSuccessNode<T>(IFlow<T> Upstream, Func<T, Task> 
 
 #region DoOnFailure Nodes
 
-internal sealed record DoOnFailureNode<T>(IFlow<T> Upstream, Action<Exception> Action) : IFlowNode<T>
+internal sealed record DoOnFailureNode<T>(IFlow<T> Upstream, Operations.DoOnFailure.Sync Action) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
-internal sealed record AsyncDoOnFailureNode<T>(IFlow<T> Upstream, Func<Exception, Task> AsyncAction) : IFlowNode<T>
+internal sealed record AsyncDoOnFailureNode<T>(IFlow<T> Upstream, Operations.DoOnFailure.Async AsyncAction) : IFlowNode<T>
+{
+    public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record CancellableAsyncDoOnFailureNode<T>(
+    IFlow<T> Upstream,
+    Operations.DoOnFailure.CancellableAsync AsyncAction) : IFlowNode<T>
 {
     public Task<Outcome<T>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<T> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
@@ -78,13 +100,21 @@ internal sealed record AsyncDoOnFailureNode<T>(IFlow<T> Upstream, Func<Exception
 
 #region Select Nodes
 
-internal sealed record SelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, TOut> Operation) : IFlowNode<TOut>
+internal sealed record SelectNode<TIn, TOut>(IFlow<TIn> Upstream, Operations.Select.Sync<TIn, TOut> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
-internal sealed record AsyncSelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, Task<TOut>> Operation) : IFlowNode<TOut>
+internal sealed record AsyncSelectNode<TIn, TOut>(IFlow<TIn> Upstream, Operations.Select.Async<TIn, TOut> Operation) : IFlowNode<TOut>
+{
+    public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record CancellableAsyncSelectNode<TIn, TOut>(
+    IFlow<TIn> Upstream,
+    Operations.Select.CancellableAsync<TIn, TOut> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
@@ -94,13 +124,21 @@ internal sealed record AsyncSelectNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn,
 
 #region Chain Nodes
 
-internal sealed record ChainNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, IFlow<TOut>> Operation) : IFlowNode<TOut>
+internal sealed record ChainNode<TIn, TOut>(IFlow<TIn> Upstream, Operations.Chain.Sync<TIn, TOut> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
 }
 
-internal sealed record AsyncChainNode<TIn, TOut>(IFlow<TIn> Upstream, Func<TIn, Task<IFlow<TOut>>> Operation) : IFlowNode<TOut>
+internal sealed record AsyncChainNode<TIn, TOut>(IFlow<TIn> Upstream, Operations.Chain.Async<TIn, TOut> Operation) : IFlowNode<TOut>
+{
+    public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
+    public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);
+}
+
+internal sealed record CancellableAsyncChainNode<TIn, TOut>(
+    IFlow<TIn> Upstream,
+    Operations.Chain.CancellableAsync<TIn, TOut> Operation) : IFlowNode<TOut>
 {
     public Task<Outcome<TOut>> ExecuteWith(FlowEngine engine) => engine.Execute(this);
     public IFlow<TOut> Apply(IBehaviourStrategy strategy) => strategy.ApplyTo(this);

@@ -55,7 +55,7 @@ public class WithBehaviourTests
             Add(Flow.Succeed("succeeded"));
             Add(Flow.Fail<string>(new Exception("dummy")));
             Add(Flow.Create(() => "created"));
-            Add(Flow.Create(async () =>
+            Add(Flow.Create<string>(async () =>
             {
                 await Task.Delay(1);
                 return "async created";
@@ -65,7 +65,7 @@ public class WithBehaviourTests
             Add(Flow.Succeed("s").DoOnFailure(_ => { }));
             Add(Flow.Succeed("s").DoOnFailure(async _ => await Task.Delay(1)));
             Add(Flow.Succeed("s").Select(_ => "selected"));
-            Add(Flow.Succeed("s").Select(async _ =>
+            Add(Flow.Succeed("s").Select<string, string>(async _ =>
             {
                 await Task.Delay(1);
                 return "async selected";

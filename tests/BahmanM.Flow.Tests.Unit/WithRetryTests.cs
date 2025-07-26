@@ -16,7 +16,7 @@ namespace BahmanM.Flow.Tests.Unit
                 Add(Flow.Succeed("succeeded"));
                 Add(Flow.Fail<string>(new Exception("dummy")));
                 Add(Flow.Succeed("s").Select(_ => "selected"));
-                Add(Flow.Succeed("s").Select(async _ => { await Task.Delay(1); return "async selected"; }));
+                Add(Flow.Succeed("s").Select<string,string>(async _ => { await Task.Delay(1); return "async selected"; }));
                 Add(Flow.Succeed("s").DoOnSuccess(_ => { }));
                 Add(Flow.Succeed("s").DoOnSuccess(async _ => await Task.Delay(1)));
                 Add(Flow.Succeed("s").DoOnFailure(_ => { }));
@@ -121,7 +121,7 @@ namespace BahmanM.Flow.Tests.Unit
         {
             // Arrange
             var attempts = 0;
-            var flakyFlow = Flow.Create(async () =>
+            var flakyFlow = Flow.Create<string>(async () =>
             {
                 attempts++;
                 await Task.Delay(1);
@@ -148,11 +148,12 @@ namespace BahmanM.Flow.Tests.Unit
             // Arrange
             var attempts = 0;
             var lastException = new InvalidOperationException("Final failure");
-            var flakyFlow = Flow.Create((Func<string>)(() =>
+            Func<string> operation = () =>
             {
                 attempts++;
                 throw (attempts == 3) ? lastException : new InvalidOperationException("Intermediate failure");
-            }));
+            };
+            var flakyFlow = Flow.Create(operation);
 
             var resilientFlow = flakyFlow.WithRetry(3);
 
@@ -163,20 +164,19 @@ namespace BahmanM.Flow.Tests.Unit
             Assert.Equal(3, attempts);
             Assert.Equal(Failure<string>(lastException), outcome);
         }
-
         
-
         [Fact]
         public async Task WithRetry_WhenNonRetryableExceptionThrown_FailsImmediately()
         {
             // Arrange
             var attempts = 0;
             var customException = new InvalidOperationException("Non-retryable exception");
-            var flow = Flow.Create((Func<string>)(() =>
+            Func<string> operation = () =>
             {
                 attempts++;
                 throw customException;
-            }));
+            };
+            var flow = Flow.Create(operation);
 
             // Configure WithRetry to treat InvalidOperationException as non-retryable
             var resilientFlow = flow.WithRetry(3, typeof(InvalidOperationException));

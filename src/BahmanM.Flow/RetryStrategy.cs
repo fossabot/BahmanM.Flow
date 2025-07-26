@@ -12,7 +12,7 @@ internal class RetryStrategy : IBehaviourStrategy
             ? maxAttempts
             : throw new ArgumentOutOfRangeException(nameof(maxAttempts), "Max attempts must be a positive integer.");
     }
-    
+
     public RetryStrategy(int maxAttempts) : this(maxAttempts, [typeof(TimeoutException)])
     {
     }
@@ -21,26 +21,33 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<T> ApplyTo<T>(SucceededNode<T> node) => node;
     public IFlow<T> ApplyTo<T>(FailedNode<T> node) => node;
+    public IFlow<T> ApplyTo<T>(CancellableAsyncCreateNode<T> node)
+    {
+        throw new NotImplementedException();
+    }
 
     public IFlow<T> ApplyTo<T>(DoOnSuccessNode<T> node) => node;
-
     public IFlow<T> ApplyTo<T>(AsyncDoOnSuccessNode<T> node) => node;
+    public IFlow<T> ApplyTo<T>(CancellableAsyncDoOnSuccessNode<T> node)
+    {
+        throw new NotImplementedException();
+    }
 
     public IFlow<T> ApplyTo<T>(DoOnFailureNode<T> node) => node;
-
     public IFlow<T> ApplyTo<T>(AsyncDoOnFailureNode<T> node) => node;
+    public IFlow<T> ApplyTo<T>(CancellableAsyncDoOnFailureNode<T> node) => node;
 
     public IFlow<TOut> ApplyTo<TIn, TOut>(SelectNode<TIn, TOut> node) => node;
-
     public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncSelectNode<TIn, TOut> node) => node;
+    public IFlow<TOut> ApplyTo<TIn, TOut>(CancellableAsyncSelectNode<TIn, TOut> node) => node;
 
     #endregion
 
     #region Rewriting Implementations
-    
+
     public IFlow<T> ApplyTo<T>(CreateNode<T> node)
     {
-        Func<T> newOperation = () =>
+        Operations.Create.Sync<T> newOperation = () =>
         {
             Exception lastException = null!;
             for (var i = 0; i < _maxAttempts; i++)
@@ -51,7 +58,7 @@ internal class RetryStrategy : IBehaviourStrategy
                 }
                 catch (Exception ex)
                 {
-                    if (_nonRetryableExceptions.Contains(ex.GetType())) 
+                    if (_nonRetryableExceptions.Contains(ex.GetType()))
                         throw;
                     lastException = ex;
                 }
@@ -63,14 +70,14 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<TOut> ApplyTo<TIn, TOut>(ChainNode<TIn, TOut> node)
     {
-        Func<TIn, IFlow<TOut>> newOperation = (value) =>
+        Operations.Chain.Sync<TIn,TOut> newOperation = (value) =>
             ((IFlowNode<TOut>)node.Operation(value)).Apply(this);
         return node with { Operation = newOperation };
     }
 
     public IFlow<T> ApplyTo<T>(AsyncCreateNode<T> node)
     {
-        Func<Task<T>> newOperation = async () =>
+        Operations.Create.Async<T> newOperation = async () =>
         {
             Exception lastException = null!;
             for (var i = 0; i < _maxAttempts; i++)
@@ -81,7 +88,7 @@ internal class RetryStrategy : IBehaviourStrategy
                 }
                 catch (Exception ex)
                 {
-                    if (_nonRetryableExceptions.Contains(ex.GetType())) 
+                    if (_nonRetryableExceptions.Contains(ex.GetType()))
                         throw;
                     lastException = ex;
                 }
@@ -93,12 +100,20 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<TOut> ApplyTo<TIn, TOut>(AsyncChainNode<TIn, TOut> node)
     {
-        Func<TIn, Task<IFlow<TOut>>> newOperation = async (value) =>
+        Operations.Chain.Async<TIn, TOut> newOperation = async (value) =>
             ((IFlowNode<TOut>)await node.Operation(value)).Apply(this);
         return node with { Operation = newOperation };
     }
 
+    public IFlow<TOut> ApplyTo<TIn, TOut>(CancellableAsyncChainNode<TIn, TOut> node)
+    {
+        Operations.Chain.CancellableAsync<TIn, TOut> newOperation = async (value, cancellationToken) =>
+            ((IFlowNode<TOut>)await node.Operation(value, cancellationToken)).Apply(this);
+        return node with { Operation = newOperation };
+    }
+
     public IFlow<T[]> ApplyTo<T>(AllNode<T> node) => node;
+
     public IFlow<T> ApplyTo<T>(AnyNode<T> node) => node;
 
     #endregion
