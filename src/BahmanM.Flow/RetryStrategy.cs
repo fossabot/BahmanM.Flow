@@ -22,6 +22,11 @@ internal class RetryStrategy : IBehaviourStrategy
     public IFlow<T> ApplyTo<T>(SucceededNode<T> node) => node;
     public IFlow<T> ApplyTo<T>(FailedNode<T> node) => node;
 
+    public IFlow<T> ApplyTo<T>(CancellableAsyncCreateNode<T> node)
+    {
+        throw new NotImplementedException();
+    }
+
     public IFlow<T> ApplyTo<T>(DoOnSuccessNode<T> node) => node;
 
     public IFlow<T> ApplyTo<T>(AsyncDoOnSuccessNode<T> node) => node;
@@ -44,7 +49,7 @@ internal class RetryStrategy : IBehaviourStrategy
     
     public IFlow<T> ApplyTo<T>(CreateNode<T> node)
     {
-        Func<T> newOperation = () =>
+        Operations.Create.Sync<T> newOperation = () =>
         {
             Exception lastException = null!;
             for (var i = 0; i < _maxAttempts; i++)
@@ -74,7 +79,7 @@ internal class RetryStrategy : IBehaviourStrategy
 
     public IFlow<T> ApplyTo<T>(AsyncCreateNode<T> node)
     {
-        Func<Task<T>> newOperation = async () =>
+        Operations.Create.Async<T> newOperation = async () =>
         {
             Exception lastException = null!;
             for (var i = 0; i < _maxAttempts; i++)

@@ -45,10 +45,14 @@ public class FlowEngine
         Task.FromResult(Outcome.Failure<T>(node.Exception));
 
     internal Task<Outcome<T>> Execute<T>(CreateNode<T> node) =>
-        TryOperation(node.Operation);
+        TryOperation.TrySync<T>(node.Operation);
 
     internal Task<Outcome<T>> Execute<T>(AsyncCreateNode<T> node) =>
-        TryOperation(node.Operation);
+        TryOperation.TryAsync<T>(() => node.Operation());
+
+    internal Task<Outcome<T>> Execute<T>(CancellableAsyncCreateNode<T> node) =>
+        TryOperation.TryCancellableAsync<T>((cancellationToken) => node.Operation(cancellationToken),
+            CancellationToken);
 
     internal async Task<Outcome<T>> Execute<T>(DoOnSuccessNode<T> node)
     {
@@ -116,8 +120,14 @@ public class FlowEngine
 
         if (upstreamOutcome is Failure<T> failure)
         {
-            try { node.Action(failure.Exception); }
-            catch { /* Ignore */ }
+            try
+            {
+                node.Action(failure.Exception);
+            }
+            catch
+            {
+                /* Ignore */
+            }
         }
 
         return upstreamOutcome;
@@ -129,8 +139,14 @@ public class FlowEngine
 
         if (upstreamOutcome is Failure<T> failure)
         {
-            try { await node.AsyncAction(failure.Exception); }
-            catch { /* Ignore */ }
+            try
+            {
+                await node.AsyncAction(failure.Exception);
+            }
+            catch
+            {
+                /* Ignore */
+            }
         }
 
         return upstreamOutcome;
@@ -142,7 +158,7 @@ public class FlowEngine
 
         return upstreamOutcome switch
         {
-            Success<TIn> s => await TryOperation(() => node.Operation(s.Value)),
+            Success<TIn> s => await TryOperation.TrySync(() => node.Operation(s.Value)),
             Failure<TIn> f => Outcome.Failure<TOut>(f.Exception),
             _ => throw new NotSupportedException($"Unsupported outcome type: {upstreamOutcome.GetType().Name}")
         };
@@ -154,7 +170,7 @@ public class FlowEngine
 
         return upstreamOutcome switch
         {
-            Success<TIn> s => await TryOperation(async () => await node.Operation(s.Value)),
+            Success<TIn> s => await TryOperation.TryAsync(async () => await node.Operation(s.Value)),
             Failure<TIn> f => Outcome.Failure<TOut>(f.Exception),
             _ => throw new NotSupportedException($"Unsupported outcome type: {upstreamOutcome.GetType().Name}")
         };
@@ -214,18 +230,18 @@ public class FlowEngine
             : Outcome.Success(outcomes.OfType<Success<T>>().Select(s => s.Value).ToArray());
     }
 
-    internal async Task<Outcome<T>> Execute<T>(AnyNode<T> node)
-    {
-        return await TryFindFirstSuccessfulFlow(
+    internal async Task<Outcome<T>> Execute<T>(AnyNode<T> node) =>
+        await TryOperation.TryFindFirstSuccessfulFlow<T>(
             node.Flows.Select(f => ((IFlowNode<T>)f).ExecuteWith(this)).ToList(),
             []);
-    }
 
-    #endregion
+#endregion
 
-    #region Private Helpers
+}
 
-    private async Task<Outcome<T>> TryFindFirstSuccessfulFlow<T>(List<Task<Outcome<T>>> remainingTasks, List<Exception> accumulatedExceptions)
+internal static class TryOperation
+{
+    internal static async Task<Outcome<T>> TryFindFirstSuccessfulFlow<T>(List<Task<Outcome<T>>> remainingTasks, List<Exception> accumulatedExceptions)
     {
         if (remainingTasks is [])
         {
@@ -248,7 +264,7 @@ public class FlowEngine
         return await TryFindFirstSuccessfulFlow(remainingTasks, accumulatedExceptions);
     }
 
-    private static Task<Outcome<T>> TryOperation<T>(Func<T> operation)
+    internal static Task<Outcome<T>> TrySync<T>(Operations.Create.Sync<T> operation)
     {
         try
         {
@@ -260,7 +276,7 @@ public class FlowEngine
         }
     }
 
-    private static async Task<Outcome<T>> TryOperation<T>(Func<Task<T>> operation)
+    internal static async Task<Outcome<T>> TryAsync<T>(Func<Task<T>> operation)
     {
         try
         {
@@ -272,5 +288,20 @@ public class FlowEngine
         }
     }
 
-    #endregion
+    internal static async Task<Outcome<T>> TryCancellableAsync<T>(Func<CancellationToken,Task<T>> operation, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Outcome.Failure<T>(new TaskCanceledException());
+        }
+
+        try
+        {
+            return Outcome.Success(await operation(cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return Outcome.Failure<T>(ex);
+        }
+    }
 }
