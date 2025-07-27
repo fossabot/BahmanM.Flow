@@ -60,7 +60,7 @@ public class DoOnSuccessTests
         // Assert
         Assert.Equal(Failure<int>(exception), outcome);
     }
-    
+
     [Fact]
     public async Task WhenFlowSucceeds_CallsAsyncActionAndReturnsOriginalSuccess()
     {
@@ -173,7 +173,7 @@ public class DoOnSuccessTests
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        var options = new FlowExecutionOptions { CancellationToken = cts.Token };
+        var options = new Execution.Options(CancellationToken: cts.Token);
 
         Operations.DoOnSuccess.CancellableAsync<int> onSuccess = async (val, token) =>
         {

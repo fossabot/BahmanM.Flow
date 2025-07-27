@@ -91,7 +91,7 @@ public class DoOnFailureTests
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        var options = new FlowExecutionOptions { CancellationToken = cts.Token };
+        var options = new Execution.Options(CancellationToken: cts.Token);
         var actionCalled = false;
         var capturedException = null as Exception;
 
