@@ -14,7 +14,7 @@ public class DoOnFailureTests
         // Arrange
         var actionCalled = false;
         Exception? capturedException = null;
-        Operations.DoOnFailure.CancellableAsync onFailure = async (ex, token) =>
+        Flow.Operations.DoOnFailure.CancellableAsync onFailure = async (ex, token) =>
         {
             await Task.Delay(100, token);
             actionCalled = true;
@@ -37,7 +37,7 @@ public class DoOnFailureTests
     {
         // Arrange
         var actionException = new InvalidOperationException("Action failed!");
-        Operations.DoOnFailure.Sync onFailure = _ => throw actionException;
+        Flow.Operations.DoOnFailure.Sync onFailure = _ => throw actionException;
         var flow = Flow.Fail<string>(ZenosException).DoOnFailure(onFailure);
 
         // Act
@@ -53,7 +53,7 @@ public class DoOnFailureTests
         // Arrange
         var actionCalled = false;
         var capturedException = null as Exception;
-        Operations.DoOnFailure.Async onFailure = async ex =>
+        Flow.Operations.DoOnFailure.Async onFailure = async ex =>
         {
             await Task.Delay(1000);
             actionCalled = true;
@@ -76,7 +76,7 @@ public class DoOnFailureTests
     {
         // Arrange
         var actionException = new InvalidOperationException("Action failed!");
-        Operations.DoOnFailure.Async onFailure = _ => throw actionException;
+        Flow.Operations.DoOnFailure.Async onFailure = _ => throw actionException;
         var flow = Flow.Fail<string>(ZenosException).DoOnFailure(onFailure);
 
         // Act
@@ -95,7 +95,7 @@ public class DoOnFailureTests
         var actionCalled = false;
         var capturedException = null as Exception;
 
-        Operations.DoOnFailure.CancellableAsync onFailure = async (ex, token) =>
+        Flow.Operations.DoOnFailure.CancellableAsync onFailure = async (ex, token) =>
         {
             await Task.Delay(1000, token);
             actionCalled = true;
