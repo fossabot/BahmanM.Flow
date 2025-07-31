@@ -59,12 +59,9 @@ public static class Flow
 
         public static class Recover
         {
-            public delegate T Sync<out T>(Exception error);
-            public delegate Task<T> Async<T>(Exception error);
-            public delegate Task<T> CancellableAsync<T>(Exception error, CancellationToken cancellationToken);
-            public delegate IFlow<T> SyncWithFlow<T>(Exception error);
-            public delegate Task<IFlow<T>> AsyncWithFlow<T>(Exception error);
-            public delegate Task<IFlow<T>> CancellableAsyncWithFlow<T>(Exception error, CancellationToken cancellationToken);
+            public delegate IFlow<T> Sync<T>(Exception error);
+            public delegate Task<IFlow<T>> Async<T>(Exception error);
+            public delegate Task<IFlow<T>> CancellableAsync<T>(Exception error, CancellationToken cancellationToken);
         }
     }
 }
