@@ -1,3 +1,4 @@
+using System.Reflection;
 using BahmanM.Flow.Ast;
 
 namespace BahmanM.Flow.Execution.Trampoline;
@@ -26,7 +27,17 @@ internal static class TrampolineEngine
                 // Handle WithResource<TResource,T> via a generic helper (avoid reflection in hot path later)
                 if (IsWithResourceNode(node))
                 {
-                    (outcome, node) = await HandleWithResourceAsync(node, options);
+                    var prep = PrepareWithResource(node);
+                    if (prep.EarlyOutcome is not null)
+                    {
+                        outcome = prep.EarlyOutcome;
+                        node = null;
+                    }
+                    else
+                    {
+                        conts.Push(prep.DisposeCont!);
+                        node = prep.Inner!;
+                    }
                     continue;
                 }
 
@@ -183,56 +194,50 @@ internal static class TrampolineEngine
         return def == typeof(Ast.Primitive.All<>) || def == typeof(Ast.Primitive.Any<>);
     }
 
-    private static async Task<(Outcome<T> outcome, INode<T>? next)> HandleWithResourceAsync<T>(INode<T> node, Options options)
+    private sealed record WithResourcePrep<T>(IContinuation<T>? DisposeCont, INode<T>? Inner, Outcome<T>? EarlyOutcome);
+
+    private static WithResourcePrep<T> PrepareWithResource<T>(INode<T> node)
     {
-        // Use dynamic to invoke the generic helper with inferred TResource (limited usage kept in one place)
-        return await HandleWithResourceDynamic((dynamic)node, options);
+        var t = node.GetType();
+        var gargs = t.GetGenericArguments();
+        var tResource = gargs[0];
+        var method = typeof(TrampolineEngine)
+            .GetMethod(nameof(PrepareWithResourceGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var gmethod = method.MakeGenericMethod(tResource, typeof(T));
+        return (WithResourcePrep<T>)gmethod.Invoke(null, new object[] { node })!;
     }
 
-    private static async Task<(Outcome<T> outcome, INode<T>? next)> HandleWithResourceDynamic<TResource, T>(Ast.Resource.WithResource<TResource, T> wr, Options options)
+    private static WithResourcePrep<T> PrepareWithResourceGeneric<TResource, T>(Ast.Resource.WithResource<TResource, T> wr)
         where TResource : IDisposable
     {
         TResource resource;
-        try { resource = wr.Acquire(); }
+        try
+        {
+            resource = wr.Acquire();
+        }
         catch (Exception ex)
         {
-            return (Outcome.Failure<T>(ex), null);
+            return new WithResourcePrep<T>(DisposeCont: null, Inner: null, EarlyOutcome: Outcome.Failure<T>(ex));
         }
 
-        // Ensure disposal on unwind
         var disposeCont = new DisposeCont<TResource, T>(resource);
 
         try
         {
             var inner = (INode<T>)wr.Use(resource);
-            // We cannot push from here; the caller will push cont via returned next node
-            // Instead, we return the next node and let the caller push the dispose continuation onto the stack.
-            // However, pushing from caller requires passing back the continuation; to keep interface simple,
-            // we attach it via a small trick: we return a Success<T> outcome indicating no-op and set next to inner,
-            // then the caller has to push disposeCont. Since we cannot pass the cont here, we change approach:
+            return new WithResourcePrep<T>(disposeCont, inner, null);
         }
-        catch (Exception ex)
+        catch (Exception useEx)
         {
-            // If Use throws before producing inner flow, return failure and no next node.
-            return (Outcome.Failure<T>(ex), null);
-        }
-
-        // The caller needs the dispose continuation; since our main loop manages the stack, we'll push here by side-effect.
-        // To enable that, we cannot from here; adjust approach: return a marker outcome and next node; caller will detect marker.
-        // For simplicity in the current skeleton, just execute the inner flow via trampoline and then dispose before returning.
-        try
-        {
-            var innerNode = (INode<T>)wr.Use(resource);
-            var outcome = await RunAsync(innerNode, options);
-            // Dispose (dominates on exception)
-            try { resource.Dispose(); }
-            catch (Exception dex) { return (Outcome.Failure<T>(dex), null); }
-            return (outcome, null);
-        }
-        catch (Exception ex)
-        {
-            try { resource.Dispose(); } catch (Exception dex) { return (Outcome.Failure<T>(dex), null); }
-            return (Outcome.Failure<T>(ex), null);
+            try
+            {
+                resource.Dispose();
+            }
+            catch (Exception disposeEx)
+            {
+                return new WithResourcePrep<T>(null, null, Outcome.Failure<T>(disposeEx));
+            }
+            return new WithResourcePrep<T>(null, null, Outcome.Failure<T>(useEx));
         }
     }
 }

@@ -8,5 +8,5 @@ public static class FlowEngine
         ExecuteAsync(flow, new Execution.Options(CancellationToken.None));
 
     public static Task<Outcome<T>> ExecuteAsync<T>(IFlow<T> flow, Execution.Options options) =>
-        flow.AsNode().Accept(new Execution.Interpreter(options));
+        Execution.Trampoline.TrampolineEngine.RunAsync(flow.AsNode(), options);
 }
