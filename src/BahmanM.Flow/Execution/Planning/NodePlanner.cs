@@ -110,23 +110,104 @@ internal static class NodePlanner
 
     private static PlannedFrame<TOut> PlanSelectSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Select.Sync<TIn, TOut> n)
     {
-        var cont = new SelectCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        return PlanSelectFusionGeneric(n.Upstream, initialSync: n.Operation, initialAsync: null, initialCanc: null);
     }
 
     private static PlannedFrame<TOut> PlanSelectAsyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Select.Async<TIn, TOut> n)
     {
-        var cont = new SelectAsyncCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        return PlanSelectFusionGeneric(n.Upstream, initialSync: null, initialAsync: n.Operation, initialCanc: null);
     }
 
     private static PlannedFrame<TOut> PlanSelectCancellableGeneric<TIn, TOut>(BahmanM.Flow.Ast.Select.CancellableAsync<TIn, TOut> n)
     {
-        var cont = new SelectCancellableCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        return PlanSelectFusionGeneric(n.Upstream, initialSync: null, initialAsync: null, initialCanc: n.Operation);
+    }
+
+    private static PlannedFrame<TOut> PlanSelectFusionGeneric<TIn, TOut>(IFlow<TIn> upstreamStart,
+        Flow.Operations.Select.Sync<TIn, TOut>? initialSync,
+        Flow.Operations.Select.Async<TIn, TOut>? initialAsync,
+        Flow.Operations.Select.CancellableAsync<TIn, TOut>? initialCanc)
+    {
+        // Fast path: only fuse same-type selects (TIn == TOut). Otherwise fallback to simple planning.
+        if (typeof(TIn) != typeof(TOut))
+        {
+            if (initialSync is not null)
+                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCont<TIn, TOut>(initialSync));
+            if (initialAsync is not null)
+                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectAsyncCont<TIn, TOut>(initialAsync));
+            // initialCanc not null
+            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCancellableCont<TIn, TOut>(initialCanc!));
+        }
+
+        // Fuse chain of Select< TIn, TIn > variants
+        var opsSync = new List<Flow.Operations.Select.Sync<TIn, TIn>>();
+        var opsAsync = new List<Flow.Operations.Select.Async<TIn, TIn>>();
+        var opsCanc = new List<Flow.Operations.Select.CancellableAsync<TIn, TIn>>();
+
+        // Seed with the initial op
+        if (initialSync is not null)
+            opsSync.Add(x => (TIn)(object)initialSync((TIn)(object)x)!);
+        if (initialAsync is not null)
+            opsAsync.Add(async x => (TIn)(object)await initialAsync((TIn)(object)x)!);
+        if (initialCanc is not null)
+            opsCanc.Add(async (x, ct) => (TIn)(object)await initialCanc((TIn)(object)x, ct)!);
+
+        var upstream = upstreamStart;
+        while (true)
+        {
+            switch (upstream)
+            {
+                case BahmanM.Flow.Ast.Select.Sync<TIn, TIn> ss:
+                    opsSync.Add(ss.Operation);
+                    upstream = ss.Upstream;
+                    continue;
+                case BahmanM.Flow.Ast.Select.Async<TIn, TIn> sa:
+                    opsAsync.Add(sa.Operation);
+                    upstream = sa.Upstream;
+                    continue;
+                case BahmanM.Flow.Ast.Select.CancellableAsync<TIn, TIn> sc:
+                    opsCanc.Add(sc.Operation);
+                    upstream = sc.Upstream;
+                    continue;
+                default:
+                    break;
+            }
+            break;
+        }
+
+        // Build fused continuation
+        if (opsCanc.Count > 0)
+        {
+            async Task<TIn> Fused(TIn v, CancellationToken ct)
+            {
+                var acc = v;
+                foreach (var op in opsSync) acc = op(acc);
+                foreach (var op in opsAsync) acc = await op(acc);
+                foreach (var op in opsCanc) acc = await op(acc, ct);
+                return acc;
+            }
+            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectCancellableCont<TIn, TOut>(async (input, ct) => (TOut)(object)await Fused(input, ct)));
+        }
+        if (opsAsync.Count > 0)
+        {
+            async Task<TIn> Fused(TIn v)
+            {
+                var acc = v;
+                foreach (var op in opsSync) acc = op(acc);
+                foreach (var op in opsAsync) acc = await op(acc);
+                return acc;
+            }
+            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectAsyncCont<TIn, TOut>(async input => (TOut)(object)await Fused(input)));
+        }
+        // All sync
+        TIn FusedSync(TIn v)
+        {
+            var acc = v;
+            foreach (var op in opsSync) acc = op(acc);
+            return acc;
+        }
+        TOut FusedSyncOut(TIn v) => (TOut)(object)FusedSync(v);
+        return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectCont<TIn, TOut>(FusedSyncOut));
     }
 
     private static PlannedFrame<TOut> PlanChainSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Sync<TIn, TOut> n)

@@ -2,12 +2,12 @@ namespace BahmanM.Flow.Tests.Unit;
 
 public class FlowEngineTests
 {
-    [Fact(Skip = "Recursive implementation is not stack-safe for long chains.")]
+    [Fact]
     [Trait("Category", "NonFunctional")]
     public async Task ExecuteAsync_WithLongChain_DoesNotCauseStackOverflow()
     {
         // Arrange
-        const int chainLength = 10_000;
+        const int chainLength = 20_000;
         var flow = Flow.Succeed(0);
         var counter = 0;
 
