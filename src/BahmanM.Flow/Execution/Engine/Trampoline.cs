@@ -39,10 +39,18 @@ internal static class Interpreter
                 // Plan Select/Chain as typed continuations with typed upstream evaluation
                 if (NodePlanner.TryPlan(node, out var plan))
                 {
-                    outcome = await plan.EvaluateUpstream(options);
                     conts.Push(plan.Continuation);
-                    node = null;
-                    continue;
+                    if (plan.UpstreamNode is not null)
+                    {
+                        node = plan.UpstreamNode;
+                        continue;
+                    }
+                    if (plan.EvaluateUpstream is not null)
+                    {
+                        outcome = await plan.EvaluateUpstream(options);
+                        node = null;
+                        continue;
+                    }
                 }
 
                 // Handle WithResource via planner with cached typed delegates

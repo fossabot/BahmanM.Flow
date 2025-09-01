@@ -9,7 +9,7 @@ namespace BahmanM.Flow.Execution.Planning;
 
 internal static class NodePlanner
 {
-    internal sealed record PlannedFrame<TOut>(Func<Options, Task<object>> EvaluateUpstream, IContinuation<TOut> Continuation);
+    internal sealed record PlannedFrame<TOut>(INode<TOut>? UpstreamNode, Func<Options, Task<object>>? EvaluateUpstream, IContinuation<TOut> Continuation);
 
     private static readonly Type SelectSyncDef = typeof(BahmanM.Flow.Ast.Select.Sync<,>);
     private static readonly Type SelectAsyncDef = typeof(BahmanM.Flow.Ast.Select.Async<,>);
@@ -132,11 +132,11 @@ internal static class NodePlanner
         if (typeof(TIn) != typeof(TOut))
         {
             if (initialSync is not null)
-                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCont<TIn, TOut>(initialSync));
+                return new PlannedFrame<TOut>(null, CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCont<TIn, TOut>(initialSync));
             if (initialAsync is not null)
-                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectAsyncCont<TIn, TOut>(initialAsync));
+                return new PlannedFrame<TOut>(null, CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectAsyncCont<TIn, TOut>(initialAsync));
             // initialCanc not null
-            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCancellableCont<TIn, TOut>(initialCanc!));
+            return new PlannedFrame<TOut>(null, CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCancellableCont<TIn, TOut>(initialCanc!));
         }
 
         // Fuse chain of Select< TIn, TIn > variants
@@ -186,7 +186,7 @@ internal static class NodePlanner
                 foreach (var op in opsCanc) acc = await op(acc, ct);
                 return acc;
             }
-            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectCancellableCont<TIn, TOut>(async (input, ct) => (TOut)(object)await Fused(input, ct)));
+            return new PlannedFrame<TOut>((INode<TOut>)upstream.AsNode(), null, new SelectCancellableCont<TIn, TOut>(async (input, ct) => (TOut)(object)await Fused(input, ct)));
         }
         if (opsAsync.Count > 0)
         {
@@ -197,7 +197,7 @@ internal static class NodePlanner
                 foreach (var op in opsAsync) acc = await op(acc);
                 return acc;
             }
-            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectAsyncCont<TIn, TOut>(async input => (TOut)(object)await Fused(input)));
+            return new PlannedFrame<TOut>((INode<TOut>)upstream.AsNode(), null, new SelectAsyncCont<TIn, TOut>(async input => (TOut)(object)await Fused(input)));
         }
         // All sync
         TIn FusedSync(TIn v)
@@ -207,28 +207,43 @@ internal static class NodePlanner
             return acc;
         }
         TOut FusedSyncOut(TIn v) => (TOut)(object)FusedSync(v);
-        return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new SelectCont<TIn, TOut>(FusedSyncOut));
+        return new PlannedFrame<TOut>((INode<TOut>)upstream.AsNode(), null, new SelectCont<TIn, TOut>(FusedSyncOut));
     }
 
     private static PlannedFrame<TOut> PlanChainSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Sync<TIn, TOut> n)
     {
         var cont = new ChainCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        var upstream = n.Upstream.AsNode();
+        if (typeof(TIn) == typeof(TOut))
+        {
+            return new PlannedFrame<TOut>((INode<TOut>)upstream, null, cont);
+        }
+        var eval = CreateEvaluateUpstream<TIn>(upstream);
+        return new PlannedFrame<TOut>(null, eval, cont);
     }
 
     private static PlannedFrame<TOut> PlanChainAsyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Async<TIn, TOut> n)
     {
         var cont = new ChainAsyncCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        var upstream = n.Upstream.AsNode();
+        if (typeof(TIn) == typeof(TOut))
+        {
+            return new PlannedFrame<TOut>((INode<TOut>)upstream, null, cont);
+        }
+        var eval = CreateEvaluateUpstream<TIn>(upstream);
+        return new PlannedFrame<TOut>(null, eval, cont);
     }
 
     private static PlannedFrame<TOut> PlanChainCancellableGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.CancellableAsync<TIn, TOut> n)
     {
         var cont = new ChainCancellableCont<TIn, TOut>(n.Operation);
-        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
-        return new PlannedFrame<TOut>(eval, cont);
+        var upstream = n.Upstream.AsNode();
+        if (typeof(TIn) == typeof(TOut))
+        {
+            return new PlannedFrame<TOut>((INode<TOut>)upstream, null, cont);
+        }
+        var eval = CreateEvaluateUpstream<TIn>(upstream);
+        return new PlannedFrame<TOut>(null, eval, cont);
     }
 
     private static Func<Options, Task<object>> CreateEvaluateUpstream<TIn>(INode<TIn> upstream)

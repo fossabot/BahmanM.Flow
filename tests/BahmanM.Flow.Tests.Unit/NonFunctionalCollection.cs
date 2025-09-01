@@ -1,5 +1,4 @@
-using Xunit;
+namespace BahmanM.Flow.Tests.Unit;
 
-[CollectionDefinition("NonFunctionalSerial", DisableParallelization = true)]
+[CollectionDefinition("NonFunctionalSerial")]
 public class NonFunctionalSerialCollection { }
-
