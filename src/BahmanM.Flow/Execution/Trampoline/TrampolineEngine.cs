@@ -39,19 +39,33 @@ internal static class TrampolineEngine
                     continue;
                 }
 
-                // Handle WithResource<TResource,T> via a generic helper (avoid reflection in hot path later)
-                if (IsWithResourceNode(node))
+                // Handle WithResource via planner with cached typed delegates
+                if (WithResourcePlanner.TryCreate(node, out var wrPlan))
                 {
-                    var prep = PrepareWithResource(node);
-                    if (prep.EarlyOutcome is not null)
+                    IDisposable resource;
+                    try
                     {
-                        outcome = prep.EarlyOutcome;
-                        node = null;
+                        resource = wrPlan.Acquire();
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        conts.Push(prep.DisposeCont!);
-                        node = prep.Inner!;
+                        outcome = Outcome.Failure<T>(ex);
+                        node = null;
+                        continue;
+                    }
+
+                    var disposeCont = wrPlan.CreateDisposeCont(resource);
+                    try
+                    {
+                        node = wrPlan.Use(resource);
+                        conts.Push(disposeCont);
+                    }
+                    catch (Exception ex)
+                    {
+                        // If Use throws before we descend, return failure; disposal still occurs on unwind now that cont is present
+                        outcome = Outcome.Failure<T>(ex);
+                        node = null;
+                        conts.Push(disposeCont);
                     }
                     continue;
                 }
@@ -182,11 +196,6 @@ internal static class TrampolineEngine
         }
     }
 
-    private static bool IsWithResourceNode<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Ast.Resource.WithResource<,>);
-    }
 
     private static bool IsAllNode<T>(INode<T> node) =>
         node.GetType().IsGenericType && node.GetType().GetGenericTypeDefinition() == typeof(Ast.Primitive.All<>);
@@ -233,54 +242,5 @@ internal static class TrampolineEngine
         var tasks = any.Flows.Select(f => RunAsync((INode<TElement>)f, options)).ToList();
         var outcome = await TryOperation.TryFindFirstSuccessfulFlow(tasks, []);
         return outcome;
-    }
-
-    // Removed dynamic/reflection path for Select/Chain; typed frame builder is used instead.
-
-    private sealed record WithResourcePrep<T>(IContinuation<T>? DisposeCont, INode<T>? Inner, Outcome<T>? EarlyOutcome);
-
-    private static WithResourcePrep<T> PrepareWithResource<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        var gargs = t.GetGenericArguments();
-        var tResource = gargs[0];
-        var method = typeof(TrampolineEngine)
-            .GetMethod(nameof(PrepareWithResourceGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tResource, typeof(T));
-        return (WithResourcePrep<T>)gmethod.Invoke(null, new object[] { node })!;
-    }
-
-    private static WithResourcePrep<T> PrepareWithResourceGeneric<TResource, T>(Ast.Resource.WithResource<TResource, T> wr)
-        where TResource : IDisposable
-    {
-        TResource resource;
-        try
-        {
-            resource = wr.Acquire();
-        }
-        catch (Exception ex)
-        {
-            return new WithResourcePrep<T>(DisposeCont: null, Inner: null, EarlyOutcome: Outcome.Failure<T>(ex));
-        }
-
-        var disposeCont = new DisposeCont<TResource, T>(resource);
-
-        try
-        {
-            var inner = (INode<T>)wr.Use(resource);
-            return new WithResourcePrep<T>(disposeCont, inner, null);
-        }
-        catch (Exception useEx)
-        {
-            try
-            {
-                resource.Dispose();
-            }
-            catch (Exception disposeEx)
-            {
-                return new WithResourcePrep<T>(null, null, Outcome.Failure<T>(disposeEx));
-            }
-            return new WithResourcePrep<T>(null, null, Outcome.Failure<T>(useEx));
-        }
     }
 }
