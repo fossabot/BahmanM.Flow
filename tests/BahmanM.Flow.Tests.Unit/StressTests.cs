@@ -1,5 +1,8 @@
+using Xunit;
+
 namespace BahmanM.Flow.Tests.Unit;
 
+[Collection("NonFunctionalSerial")]
 public class StressTests
 {
     [Fact]

@@ -212,95 +212,23 @@ internal static class NodePlanner
 
     private static PlannedFrame<TOut> PlanChainSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Sync<TIn, TOut> n)
     {
-        return PlanChainFusionGeneric(n.Upstream, initialSync: n.Operation, initialAsync: null, initialCanc: null);
+        var cont = new ChainCont<TIn, TOut>(n.Operation);
+        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
+        return new PlannedFrame<TOut>(eval, cont);
     }
 
     private static PlannedFrame<TOut> PlanChainAsyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Async<TIn, TOut> n)
     {
-        return PlanChainFusionGeneric(n.Upstream, initialSync: null, initialAsync: n.Operation, initialCanc: null);
+        var cont = new ChainAsyncCont<TIn, TOut>(n.Operation);
+        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
+        return new PlannedFrame<TOut>(eval, cont);
     }
 
     private static PlannedFrame<TOut> PlanChainCancellableGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.CancellableAsync<TIn, TOut> n)
     {
-        return PlanChainFusionGeneric(n.Upstream, initialSync: null, initialAsync: null, initialCanc: n.Operation);
-    }
-
-    private static PlannedFrame<TOut> PlanChainFusionGeneric<TIn, TOut>(IFlow<TIn> upstreamStart,
-        Flow.Operations.Chain.Sync<TIn, TOut>? initialSync,
-        Flow.Operations.Chain.Async<TIn, TOut>? initialAsync,
-        Flow.Operations.Chain.CancellableAsync<TIn, TOut>? initialCanc)
-    {
-        // Only fuse when TIn == TOut to keep continuation type simple; else fallback
-        var sameType = typeof(TIn) == typeof(TOut);
-        if (!sameType)
-        {
-            if (initialSync is not null)
-                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new ChainCont<TIn, TOut>(initialSync));
-            if (initialAsync is not null)
-                return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new ChainAsyncCont<TIn, TOut>(initialAsync));
-            return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new ChainCancellableCont<TIn, TOut>(initialCanc!));
-        }
-
-        // Collect Chain<TIn,TIn> operations
-        var opsSync = new List<Flow.Operations.Chain.Sync<TIn, TIn>>();
-        var opsAsync = new List<Flow.Operations.Chain.Async<TIn, TIn>>();
-        var opsCanc = new List<Flow.Operations.Chain.CancellableAsync<TIn, TIn>>();
-
-        if (initialSync is not null)
-            opsSync.Add(x => (IFlow<TIn>)(object)initialSync((TIn)(object)x)!);
-        if (initialAsync is not null)
-            opsAsync.Add(async x => (IFlow<TIn>)(object)await initialAsync((TIn)(object)x)!);
-        if (initialCanc is not null)
-            opsCanc.Add(async (x, ct) => (IFlow<TIn>)(object)await initialCanc((TIn)(object)x, ct)!);
-
-        var upstream = upstreamStart;
-        while (true)
-        {
-            switch (upstream)
-            {
-                case BahmanM.Flow.Ast.Chain.Sync<TIn, TIn> cs:
-                    opsSync.Add(cs.Operation);
-                    upstream = cs.Upstream;
-                    continue;
-                case BahmanM.Flow.Ast.Chain.Async<TIn, TIn> ca:
-                    opsAsync.Add(ca.Operation);
-                    upstream = ca.Upstream;
-                    continue;
-                case BahmanM.Flow.Ast.Chain.CancellableAsync<TIn, TIn> cc:
-                    opsCanc.Add(cc.Operation);
-                    upstream = cc.Upstream;
-                    continue;
-                default:
-                    break;
-            }
-            break;
-        }
-
-        // Build fused sync delegate that returns IFlow<TIn> by chaining through Flow's Chain operators
-        IFlow<TIn> FusedFlow(TIn v)
-        {
-            // Start with first op if any, otherwise identity succeed
-            IFlow<TIn> flow = opsSync.Count > 0 ? opsSync[0](v) : Flow.Succeed(v);
-
-            for (int i = (opsSync.Count > 0 ? 1 : 0); i < opsSync.Count; i++)
-            {
-                var op = opsSync[i];
-                flow = flow.Chain(op);
-            }
-            foreach (var op in opsAsync)
-            {
-                flow = flow.Chain(op);
-            }
-            foreach (var op in opsCanc)
-            {
-                flow = flow.Chain(op);
-            }
-            return flow;
-        }
-
-        // We can always return a sync Chain continuation in same-type case
-        Flow.Operations.Chain.Sync<TIn, TOut> fused = x => (IFlow<TOut>)(object)FusedFlow(x);
-        return new PlannedFrame<TOut>(CreateEvaluateUpstream<TIn>(upstream.AsNode()), new ChainCont<TIn, TOut>(fused));
+        var cont = new ChainCancellableCont<TIn, TOut>(n.Operation);
+        var eval = CreateEvaluateUpstream<TIn>(n.Upstream.AsNode());
+        return new PlannedFrame<TOut>(eval, cont);
     }
 
     private static Func<Options, Task<object>> CreateEvaluateUpstream<TIn>(INode<TIn> upstream)
