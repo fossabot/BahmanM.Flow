@@ -18,11 +18,11 @@ public class StressTests
         Assert.Equal(depth, success.Value);
     }
 
-    [Fact(Skip = "Pending non-recursive upstream planning for Chain to avoid call-stack growth.")]
+    [Fact]
     [Trait("Category", "NonFunctional")]
     public async Task Chain_50k_Sequences_Correctly()
     {
-        const int depth = 2_000;
+        const int depth = 50_000;
         var flow = Flow.Succeed(0);
         for (var i = 0; i < depth; i++)
         {
