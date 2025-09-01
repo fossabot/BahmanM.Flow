@@ -30,20 +30,11 @@ internal static class TrampolineEngine
                     continue;
                 }
 
-                // Handle Select/Chain via typed continuations and trampoline evaluation of upstream
-                if (IsSelectNode(node))
+                // Plan Select/Chain as typed continuations with typed upstream evaluation
+                if (NodePlanner.TryPlan(node, out var plan))
                 {
-                    var (cont, upstream, tIn) = PrepareSelectCont(node);
-                    conts.Push(cont);
-                    outcome = await RunAsyncObject(upstream, tIn, options);
-                    node = null;
-                    continue;
-                }
-                if (IsChainNode(node))
-                {
-                    var (cont, upstream, tIn) = PrepareChainCont(node);
-                    conts.Push(cont);
-                    outcome = await RunAsyncObject(upstream, tIn, options);
+                    outcome = await plan.EvaluateUpstream(options);
+                    conts.Push(plan.Continuation);
                     node = null;
                     continue;
                 }
@@ -244,105 +235,7 @@ internal static class TrampolineEngine
         return outcome;
     }
 
-    private static bool IsSelectNode<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        if (!t.IsGenericType) return false;
-        var def = t.GetGenericTypeDefinition();
-        return def == typeof(Ast.Select.Sync<,>) || def == typeof(Ast.Select.Async<,>) || def == typeof(Ast.Select.CancellableAsync<,>);
-    }
-
-    private static bool IsChainNode<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        if (!t.IsGenericType) return false;
-        var def = t.GetGenericTypeDefinition();
-        return def == typeof(Ast.Chain.Sync<,>) || def == typeof(Ast.Chain.Async<,>) || def == typeof(Ast.Chain.CancellableAsync<,>);
-    }
-
-    private static (IContinuation<T> cont, object upstream, Type tIn) PrepareSelectCont<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        var gargs = t.GetGenericArguments();
-        var tIn = gargs[0];
-        var def = t.GetGenericTypeDefinition();
-
-        if (def == typeof(Ast.Select.Sync<,>))
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(SelectCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-        if (def == typeof(Ast.Select.Async<,>))
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(SelectAsyncCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-        // Cancellable
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(SelectCancellableCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-    }
-
-    private static (IContinuation<T> cont, object upstream, Type tIn) PrepareChainCont<T>(INode<T> node)
-    {
-        var t = node.GetType();
-        var gargs = t.GetGenericArguments();
-        var tIn = gargs[0];
-        var def = t.GetGenericTypeDefinition();
-
-        if (def == typeof(Ast.Chain.Sync<,>))
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(ChainCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-        if (def == typeof(Ast.Chain.Async<,>))
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(ChainAsyncCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-        // Cancellable
-        {
-            dynamic dyn = node;
-            var op = (Delegate)dyn.Operation;
-            var contType = typeof(ChainCancellableCont<,>).MakeGenericType(tIn, typeof(T));
-            var cont = (IContinuation<T>)Activator.CreateInstance(contType, op)!;
-            var upstream = (object)dyn.Upstream;
-            return (cont, upstream, tIn);
-        }
-    }
-
-    private static Task<object> RunAsyncObject(object upstreamNode, Type tIn, Options options)
-    {
-        var method = typeof(TrampolineEngine).GetMethod(nameof(RunAsyncObjectGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(tIn);
-        return (Task<object>)method.Invoke(null, new object[] { upstreamNode, options })!;
-    }
-
-    private static async Task<object> RunAsyncObjectGeneric<TIn>(object upstreamNode, Options options)
-    {
-        return await RunAsync((INode<TIn>)upstreamNode, options);
-    }
+    // Removed dynamic/reflection path for Select/Chain; typed frame builder is used instead.
 
     private sealed record WithResourcePrep<T>(IContinuation<T>? DisposeCont, INode<T>? Inner, Outcome<T>? EarlyOutcome);
 
