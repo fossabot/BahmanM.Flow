@@ -1,4 +1,6 @@
-namespace BahmanM.Flow.Execution.Trampoline;
+using BahmanM.Flow.Execution.Engine;
+
+namespace BahmanM.Flow.Execution.Continuations.Resource;
 
 internal sealed class DisposeCont<TResource, T>(TResource resource) : IContinuation<T>
     where TResource : IDisposable
@@ -23,4 +25,3 @@ internal sealed class DisposeCont<TResource, T>(TResource resource) : IContinuat
         return Task.FromResult<FrameResult<T>>(new OutcomeResult<T>((Outcome<T>)outcome));
     }
 }
-

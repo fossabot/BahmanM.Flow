@@ -1,7 +1,9 @@
 using System.Reflection;
 using BahmanM.Flow.Ast;
+using BahmanM.Flow.Execution.Continuations;
+using BahmanM.Flow.Execution.Continuations.Resource;
 
-namespace BahmanM.Flow.Execution.Trampoline;
+namespace BahmanM.Flow.Execution.Planning;
 
 internal interface IWithResourcePlan<T>
 {
@@ -45,4 +47,3 @@ internal static class WithResourcePlanner
         public IContinuation<T> CreateDisposeCont(IDisposable resource) => new DisposeCont<TResource, T>((TResource)resource);
     }
 }
-

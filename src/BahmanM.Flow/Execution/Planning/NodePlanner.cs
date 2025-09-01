@@ -1,8 +1,11 @@
 using System.Reflection;
 using BahmanM.Flow.Ast;
-using BahmanM.Flow.Execution;
+using BahmanM.Flow.Execution.Continuations;
+using BahmanM.Flow.Execution.Continuations.Chain;
+using BahmanM.Flow.Execution.Continuations.Select;
+using BahmanM.Flow.Execution.Engine;
 
-namespace BahmanM.Flow.Execution.Trampoline;
+namespace BahmanM.Flow.Execution.Planning;
 
 internal static class NodePlanner
 {
@@ -148,5 +151,5 @@ internal static class NodePlanner
     }
 
     private static Func<Options, Task<object>> CreateEvaluateUpstream<TIn>(INode<TIn> upstream)
-        => async (Options options) => await TrampolineEngine.RunAsync(upstream, options);
+        => async (Options options) => await Interpreter.ExecuteAsync(upstream, options);
 }

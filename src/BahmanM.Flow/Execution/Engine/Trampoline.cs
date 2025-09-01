@@ -1,11 +1,17 @@
 using System.Reflection;
 using BahmanM.Flow.Ast;
+using BahmanM.Flow.Execution.Continuations;
+using BahmanM.Flow.Execution.Continuations.DoOnFailure;
+using BahmanM.Flow.Execution.Continuations.DoOnSuccess;
+using BahmanM.Flow.Execution.Continuations.Recover;
+using BahmanM.Flow.Execution.Continuations.Validate;
+using BahmanM.Flow.Execution.Planning;
 
-namespace BahmanM.Flow.Execution.Trampoline;
+namespace BahmanM.Flow.Execution.Engine;
 
-internal static class TrampolineEngine
+internal static class Interpreter
 {
-    internal static async Task<Outcome<T>> RunAsync<T>(INode<T> root, Options options)
+    internal static async Task<Outcome<T>> ExecuteAsync<T>(INode<T> root, Options options)
     {
         var conts = new Stack<IContinuation<T>>();
         INode<T>? node = root;
@@ -196,7 +202,6 @@ internal static class TrampolineEngine
         }
     }
 
-
     private static bool IsAllNode<T>(INode<T> node) =>
         node.GetType().IsGenericType && node.GetType().GetGenericTypeDefinition() == typeof(Ast.Primitive.All<>);
 
@@ -207,7 +212,7 @@ internal static class TrampolineEngine
     {
         var t = node.GetType();
         var elem = t.GetGenericArguments()[0];
-        var method = typeof(TrampolineEngine).GetMethod(nameof(EvaluateAllGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+        var method = typeof(Interpreter).GetMethod(nameof(EvaluateAllGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(elem);
         var task = (Task<object>)method.Invoke(null, new object[] { node, options })!;
         var resultObj = await task;
@@ -218,7 +223,7 @@ internal static class TrampolineEngine
     {
         var t = node.GetType();
         var elem = t.GetGenericArguments()[0];
-        var method = typeof(TrampolineEngine).GetMethod(nameof(EvaluateAnyGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+        var method = typeof(Interpreter).GetMethod(nameof(EvaluateAnyGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(elem);
         var task = (Task<object>)method.Invoke(null, new object[] { node, options })!;
         var resultObj = await task;
@@ -227,7 +232,7 @@ internal static class TrampolineEngine
 
     private static async Task<object> EvaluateAllGeneric<TElement>(Ast.Primitive.All<TElement> all, Options options)
     {
-        var tasks = all.Flows.Select(f => RunAsync((INode<TElement>)f, options)).ToList();
+        var tasks = all.Flows.Select(f => Interpreter.ExecuteAsync((INode<TElement>)f, options)).ToList();
         var outcomes = await Task.WhenAll(tasks);
         var exceptions = outcomes.OfType<Failure<TElement>>().Select(f => f.Exception).ToList();
         if (exceptions.Count > 0)
@@ -239,7 +244,7 @@ internal static class TrampolineEngine
 
     private static async Task<object> EvaluateAnyGeneric<TElement>(Ast.Primitive.Any<TElement> any, Options options)
     {
-        var tasks = any.Flows.Select(f => RunAsync((INode<TElement>)f, options)).ToList();
+        var tasks = any.Flows.Select(f => Interpreter.ExecuteAsync((INode<TElement>)f, options)).ToList();
         var outcome = await TryOperation.TryFindFirstSuccessfulFlow(tasks, []);
         return outcome;
     }
