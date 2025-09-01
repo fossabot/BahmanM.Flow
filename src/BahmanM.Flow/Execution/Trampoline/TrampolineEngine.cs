@@ -16,8 +16,22 @@ internal static class TrampolineEngine
             // Descend: push continuations; evaluate leaves
             while (node is not null)
             {
-                // Temporary fallback for type-changing or composite nodes (Select/Chain/All/Any): evaluate remainder via recursive interpreter
-                if (IsTypeChangingNode(node) || IsCompositeNode(node))
+                // Handle composite nodes (All/Any) directly in trampoline
+                if (IsAllNode(node))
+                {
+                    outcome = await EvaluateAllAsync(node, options);
+                    node = null;
+                    continue;
+                }
+                if (IsAnyNode(node))
+                {
+                    outcome = await EvaluateAnyAsync(node, options);
+                    node = null;
+                    continue;
+                }
+
+                // Temporary fallback for type-changing nodes (Select/Chain): evaluate remainder via recursive interpreter
+                if (IsTypeChangingNode(node))
                 {
                     outcome = await node.Accept(new Execution.Interpreter(options));
                     node = null;
@@ -186,12 +200,51 @@ internal static class TrampolineEngine
         return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Ast.Resource.WithResource<,>);
     }
 
-    private static bool IsCompositeNode<T>(INode<T> node)
+    private static bool IsAllNode<T>(INode<T> node) =>
+        node.GetType().IsGenericType && node.GetType().GetGenericTypeDefinition() == typeof(Ast.Primitive.All<>);
+
+    private static bool IsAnyNode<T>(INode<T> node) =>
+        node.GetType().IsGenericType && node.GetType().GetGenericTypeDefinition() == typeof(Ast.Primitive.Any<>);
+
+    private static async Task<Outcome<T>> EvaluateAllAsync<T>(INode<T> node, Options options)
     {
         var t = node.GetType();
-        if (!t.IsGenericType) return false;
-        var def = t.GetGenericTypeDefinition();
-        return def == typeof(Ast.Primitive.All<>) || def == typeof(Ast.Primitive.Any<>);
+        var elem = t.GetGenericArguments()[0];
+        var method = typeof(TrampolineEngine).GetMethod(nameof(EvaluateAllGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(elem);
+        var task = (Task<object>)method.Invoke(null, new object[] { node, options })!;
+        var resultObj = await task;
+        return (Outcome<T>)resultObj;
+    }
+
+    private static async Task<Outcome<T>> EvaluateAnyAsync<T>(INode<T> node, Options options)
+    {
+        var t = node.GetType();
+        var elem = t.GetGenericArguments()[0];
+        var method = typeof(TrampolineEngine).GetMethod(nameof(EvaluateAnyGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(elem);
+        var task = (Task<object>)method.Invoke(null, new object[] { node, options })!;
+        var resultObj = await task;
+        return (Outcome<T>)resultObj;
+    }
+
+    private static async Task<object> EvaluateAllGeneric<TElement>(Ast.Primitive.All<TElement> all, Options options)
+    {
+        var tasks = all.Flows.Select(f => RunAsync((INode<TElement>)f, options)).ToList();
+        var outcomes = await Task.WhenAll(tasks);
+        var exceptions = outcomes.OfType<Failure<TElement>>().Select(f => f.Exception).ToList();
+        if (exceptions.Count > 0)
+        {
+            return Outcome.Failure<TElement[]>(new AggregateException(exceptions));
+        }
+        return Outcome.Success(outcomes.OfType<Success<TElement>>().Select(s => s.Value).ToArray());
+    }
+
+    private static async Task<object> EvaluateAnyGeneric<TElement>(Ast.Primitive.Any<TElement> any, Options options)
+    {
+        var tasks = any.Flows.Select(f => RunAsync((INode<TElement>)f, options)).ToList();
+        var outcome = await TryOperation.TryFindFirstSuccessfulFlow(tasks, []);
+        return outcome;
     }
 
     private sealed record WithResourcePrep<T>(IContinuation<T>? DisposeCont, INode<T>? Inner, Outcome<T>? EarlyOutcome);
