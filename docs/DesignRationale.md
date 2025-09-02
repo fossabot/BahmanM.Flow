@@ -8,22 +8,11 @@ The central architectural pattern is a strict separation of concerns:
 
 *   **`IFlow<T>` is the Recipe:** It is a purely declarative, **immutable** data structure representing a sequence of operations. It is an Abstract Syntax Tree (AST) that defines *what* to do, not *how* to do it. Each operation in a `Flow` (e.g., `SucceededFlow`, `SelectFlow`) is a node in this AST.
 
-*   **`FlowEngine` is the Chef:** It is the interpreter that executes the `IFlow<T>` AST. The engine uses the **Visitor pattern** to traverse the AST, executing each node in a type-safe manner. This provides compile-time safety, ensuring that every possible operation in our Flow "language" is handled by the engine.
+*   **`FlowEngine` is the Chef:** It is the interpreter that executes the `IFlow<T>` AST using a stack‑safe trampoline, continuations, and operator‑specific planning. For a detailed, practical explanation of how execution works phase‑by‑phase, see [Trampoline Execution Engine](./Trampoline-Execution-Engine.md).
 
 *   **Operators are Pure Functions:** All extension methods in `FlowExtensions` (e.g., `.Chain()`, `.Select()`) are pure functions. They take a flow as input and return a **new, decorated `IFlow<T>` instance**, never modifying the original. This guarantees that flow declarations are immutable, reusable, and safe to share.
 
-### 1a. The Visitor Pattern in Detail
-
-To keep the public `IFlow<T>` interface lean, the Visitor pattern is implemented using an `internal` interface:
-
-1.  **`public interface IFlow<T>`:** The public-facing interface, which remains a simple, clean marker.
-2.  **`internal interface IVisitableFlow<T>`:** An internal interface that adds an `ExecuteWith(FlowEngine engine)` method.
-3.  **Concrete Flow Types:** All internal AST nodes (e.g., `SucceededFlow<T>`) implement `IVisitableFlow<T>`.
-4.  **`FlowEngine` as the Visitor:** The `FlowEngine` is an instance class with overloaded `Execute(...)` methods for each concrete flow type.
-
-When `FlowEngine.ExecuteAsync` is called, it casts the public `IFlow<T>` to the internal `IVisitableFlow<T>` and begins the execution. This design provides the static, compile-time safety of the Visitor pattern without polluting the public API, at the cost of a single, controlled cast at the entry point.
-
-### 1b. The Philosophy: Pragmatism over Purity
+### 1a. The Philosophy: Pragmatism over Purity
 
 While Flow is heavily inspired by functional programming concepts, it is not a strict FP framework. 
 
