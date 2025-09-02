@@ -12,13 +12,13 @@ public class FramePlanningTests
     {
         var flow = Flow.Succeed(1).Select<int, int>(x => x + 1);
         var node = flow.AsNode();
-        var stack = new Stack<IContinuation<int>>();
+        var continuations = new Stack<IContinuation<int>>();
 
-        var result = await FramePlanning.TryPlanAsync(node, stack, new BahmanM.Flow.Execution.Options(CancellationToken.None));
+        var result = await FramePlanning.TryPlanAsync(node, continuations, new BahmanM.Flow.Execution.Options(CancellationToken.None));
         Assert.True(result.Handled);
         Assert.NotNull(result.NextNode);
         Assert.Null(result.Outcome);
-        Assert.Single(stack);
+        Assert.Single(continuations);
     }
 
     [Fact]
@@ -26,14 +26,14 @@ public class FramePlanningTests
     {
         var flow = Flow.Succeed(7).Select<int, string>(x => x.ToString());
         var node = flow.AsNode();
-        var stack = new Stack<IContinuation<string>>();
+        var continuations = new Stack<IContinuation<string>>();
 
-        var result = await FramePlanning.TryPlanAsync(node, stack, new BahmanM.Flow.Execution.Options(CancellationToken.None));
+        var result = await FramePlanning.TryPlanAsync(node, continuations, new BahmanM.Flow.Execution.Options(CancellationToken.None));
         Assert.True(result.Handled);
         Assert.Null(result.NextNode);
         var upstreamOutcome = Assert.IsAssignableFrom<Outcome<int>>(result.Outcome);
         var success = Assert.IsType<Success<int>>(upstreamOutcome);
         Assert.Equal(7, success.Value);
-        Assert.Single(stack);
+        Assert.Single(continuations);
     }
 }

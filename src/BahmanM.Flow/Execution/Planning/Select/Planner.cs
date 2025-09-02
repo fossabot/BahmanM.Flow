@@ -10,58 +10,58 @@ internal static class SelectPlanner
     private static readonly Type SelectAsyncDef = typeof(BahmanM.Flow.Ast.Select.Async<,>);
     private static readonly Type SelectCancellableDef = typeof(BahmanM.Flow.Ast.Select.CancellableAsync<,>);
 
-    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plan)
+    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plannedFrame)
     {
-        var t = node.GetType();
-        if (!t.IsGenericType)
+        var nodeType = node.GetType();
+        if (!nodeType.IsGenericType)
         {
-            plan = null!;
+            plannedFrame = null!;
             return false;
         }
 
-        var def = t.GetGenericTypeDefinition();
-        var args = t.GetGenericArguments();
-        var tIn = args[0];
+        var genericDefinition = nodeType.GetGenericTypeDefinition();
+        var typeArguments = nodeType.GetGenericArguments();
+        var inputType = typeArguments[0];
 
-        if (def == SelectSyncDef)
+        if (genericDefinition == SelectSyncDef)
         {
-            plan = PlanSelectSync<TOut>(node, tIn);
+            plannedFrame = PlanSelectSync<TOut>(node, inputType);
             return true;
         }
-        if (def == SelectAsyncDef)
+        if (genericDefinition == SelectAsyncDef)
         {
-            plan = PlanSelectAsync<TOut>(node, tIn);
+            plannedFrame = PlanSelectAsync<TOut>(node, inputType);
             return true;
         }
-        if (def == SelectCancellableDef)
+        if (genericDefinition == SelectCancellableDef)
         {
-            plan = PlanSelectCancellable<TOut>(node, tIn);
+            plannedFrame = PlanSelectCancellable<TOut>(node, inputType);
             return true;
         }
 
-        plan = null!;
+        plannedFrame = null!;
         return false;
     }
 
-    private static PlannedFrame<TOut> PlanSelectSync<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanSelectSync<TOut>(object node, Type inputType)
     {
-        var method = typeof(SelectPlanner).GetMethod(nameof(PlanSelectSyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(SelectPlanner).GetMethod(nameof(PlanSelectSyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
-    private static PlannedFrame<TOut> PlanSelectAsync<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanSelectAsync<TOut>(object node, Type inputType)
     {
-        var method = typeof(SelectPlanner).GetMethod(nameof(PlanSelectAsyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(SelectPlanner).GetMethod(nameof(PlanSelectAsyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
-    private static PlannedFrame<TOut> PlanSelectCancellable<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanSelectCancellable<TOut>(object node, Type inputType)
     {
-        var method = typeof(SelectPlanner).GetMethod(nameof(PlanSelectCancellableGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(SelectPlanner).GetMethod(nameof(PlanSelectCancellableGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
     private static PlannedFrame<TOut> PlanSelectSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Select.Sync<TIn, TOut> n)
@@ -88,9 +88,9 @@ internal static class SelectPlanner
             return new PlannedFrame<TOut>(null, PlannerCommon.CreateEvaluateUpstream<TIn>(upstreamStart.AsNode()), new SelectCancellableCont<TIn, TOut>(initialCanc!));
         }
 
-        var method = typeof(SelectPlanner).GetMethod(nameof(PlanSelectSameTypeGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(typeof(TIn));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [upstreamStart, initialSync, initialAsync, initialCanc])!;
+        var dispatch = typeof(SelectPlanner).GetMethod(nameof(PlanSelectSameTypeGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(typeof(TIn));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [upstreamStart, initialSync, initialAsync, initialCanc])!;
     }
 
     private static PlannedFrame<T> PlanSelectSameTypeGeneric<T>(
@@ -99,21 +99,21 @@ internal static class SelectPlanner
         Flow.Operations.Select.Async<T, T>? initialAsync,
         Flow.Operations.Select.CancellableAsync<T, T>? initialCanc)
     {
-        var (upstreamNode, pipeline) = SelectFusion.Build(upstreamStart, initialSync, initialAsync, initialCanc);
+        var (upstreamNode, sequence) = MergeConsecutiveSelectOperations.MergeAdjacent(upstreamStart, initialSync, initialAsync, initialCanc);
 
-        if (pipeline.UsesCancellation)
+        if (sequence.UsesCancellation)
         {
             return new PlannedFrame<T>(upstreamNode, null,
-                new SelectCancellableCont<T, T>(async (value, ct) => await pipeline.Run(value, ct)));
+                new SelectCancellableCont<T, T>(async (value, ct) => await sequence.Run(value, ct)));
         }
 
-        if (pipeline.UsesAsync)
+        if (sequence.UsesAsync)
         {
             return new PlannedFrame<T>(upstreamNode, null,
-                new SelectAsyncCont<T, T>(async value => await pipeline.Run(value, CancellationToken.None)));
+                new SelectAsyncCont<T, T>(async value => await sequence.Run(value, CancellationToken.None)));
         }
 
         return new PlannedFrame<T>(upstreamNode, null,
-            new SelectCont<T, T>(value => pipeline.RunSync(value)));
+            new SelectCont<T, T>(value => sequence.RunSync(value)));
     }
 }

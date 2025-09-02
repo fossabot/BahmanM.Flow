@@ -18,14 +18,14 @@ public class ResourceScopeTests
         var flow = Flow.WithResource<Dummy, int>(() => throw new Exception("acquire"), _ => Flow.Succeed(1));
         var node = flow.AsNode();
 
-        var stack = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
-        var result = ResourceScope.TryOpen(node, stack);
+        var continuations = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
+        var result = ResourceScope.TryOpen(node, continuations);
 
         Assert.True(result.Handled);
         Assert.Null(result.NextNode);
         var failure = Assert.IsType<Failure<int>>(result.Outcome);
         Assert.Equal("acquire", failure.Exception.Message);
-        Assert.Empty(stack);
+        Assert.Empty(continuations);
     }
 
     [Fact]
@@ -34,13 +34,13 @@ public class ResourceScopeTests
         Dummy.Disposed = 0;
         var flow = Flow.WithResource<Dummy, int>(() => new Dummy(), _ => throw new Exception("use"));
         var node = flow.AsNode();
-        var stack = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
+        var continuations = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
 
-        var result = ResourceScope.TryOpen(node, stack);
+        var result = ResourceScope.TryOpen(node, continuations);
         Assert.True(result.Handled);
         Assert.Null(result.NextNode);
         Assert.IsType<Failure<int>>(result.Outcome);
-        Assert.Single(stack); // disposer pushed
+        Assert.Single(continuations); // disposer pushed
     }
 
     [Fact]
@@ -48,13 +48,12 @@ public class ResourceScopeTests
     {
         var flow = Flow.WithResource<Dummy, int>(() => new Dummy(), _ => Flow.Succeed(7));
         var node = flow.AsNode();
-        var stack = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
+        var continuations = new Stack<BahmanM.Flow.Execution.Continuations.IContinuation<int>>();
 
-        var result = ResourceScope.TryOpen(node, stack);
+        var result = ResourceScope.TryOpen(node, continuations);
         Assert.True(result.Handled);
         Assert.NotNull(result.NextNode);
         Assert.Null(result.Outcome);
-        Assert.Single(stack);
+        Assert.Single(continuations);
     }
 }
-

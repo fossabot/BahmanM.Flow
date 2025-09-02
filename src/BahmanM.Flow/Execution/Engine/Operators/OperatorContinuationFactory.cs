@@ -9,48 +9,47 @@ namespace BahmanM.Flow.Execution.Engine.Operators;
 
 internal static class OperatorContinuationFactory
 {
-    internal static bool TryPush<T>(ref INode<T> node, Stack<IContinuation<T>> conts)
+    internal static bool TryPush<T>(ref INode<T> currentNode, Stack<IContinuation<T>> continuations)
     {
-        switch (node)
+        switch (currentNode)
         {
-            case Ast.DoOnSuccess.Sync<T> dss:
-                conts.Push(new DoOnSuccessCont<T>(dss.Action));
-                node = (INode<T>)dss.Upstream; return true;
-            case Ast.DoOnSuccess.Async<T> dsa:
-                conts.Push(new DoOnSuccessAsyncCont<T>(dsa.AsyncAction));
-                node = (INode<T>)dsa.Upstream; return true;
-            case Ast.DoOnSuccess.CancellableAsync<T> dsc:
-                conts.Push(new DoOnSuccessCancellableCont<T>(dsc.AsyncAction));
-                node = (INode<T>)dsc.Upstream; return true;
-            case Ast.DoOnFailure.Sync<T> dfs:
-                conts.Push(new DoOnFailureCont<T>(dfs.Action));
-                node = (INode<T>)dfs.Upstream; return true;
-            case Ast.DoOnFailure.Async<T> dfa:
-                conts.Push(new DoOnFailureAsyncCont<T>(dfa.AsyncAction));
-                node = (INode<T>)dfa.Upstream; return true;
-            case Ast.DoOnFailure.CancellableAsync<T> dfc:
-                conts.Push(new DoOnFailureCancellableCont<T>(dfc.AsyncAction));
-                node = (INode<T>)dfc.Upstream; return true;
-            case Ast.Validate.Sync<T> vs:
-                conts.Push(new ValidateCont<T>(vs.Predicate, vs.ExceptionFactory));
-                node = (INode<T>)vs.Upstream; return true;
-            case Ast.Validate.Async<T> va:
-                conts.Push(new ValidateAsyncCont<T>(va.PredicateAsync, va.ExceptionFactory));
-                node = (INode<T>)va.Upstream; return true;
-            case Ast.Validate.CancellableAsync<T> vc:
-                conts.Push(new ValidateCancellableCont<T>(vc.PredicateCancellableAsync, vc.ExceptionFactory));
-                node = (INode<T>)vc.Upstream; return true;
-            case Ast.Recover.Sync<T> rs:
-                conts.Push(new RecoverCont<T>(rs.Recover));
-                node = (INode<T>)rs.Source; return true;
-            case Ast.Recover.Async<T> ra:
-                conts.Push(new RecoverAsyncCont<T>(ra.Recover));
-                node = (INode<T>)ra.Source; return true;
-            case Ast.Recover.CancellableAsync<T> rc:
-                conts.Push(new RecoverCancellableCont<T>((ex, ct) => rc.Recover(ex, ct)));
-                node = (INode<T>)rc.Source; return true;
+            case Ast.DoOnSuccess.Sync<T> successSync:
+                continuations.Push(new DoOnSuccessCont<T>(successSync.Action));
+                currentNode = (INode<T>)successSync.Upstream; return true;
+            case Ast.DoOnSuccess.Async<T> successAsync:
+                continuations.Push(new DoOnSuccessAsyncCont<T>(successAsync.AsyncAction));
+                currentNode = (INode<T>)successAsync.Upstream; return true;
+            case Ast.DoOnSuccess.CancellableAsync<T> successCancellable:
+                continuations.Push(new DoOnSuccessCancellableCont<T>(successCancellable.AsyncAction));
+                currentNode = (INode<T>)successCancellable.Upstream; return true;
+            case Ast.DoOnFailure.Sync<T> failureSync:
+                continuations.Push(new DoOnFailureCont<T>(failureSync.Action));
+                currentNode = (INode<T>)failureSync.Upstream; return true;
+            case Ast.DoOnFailure.Async<T> failureAsync:
+                continuations.Push(new DoOnFailureAsyncCont<T>(failureAsync.AsyncAction));
+                currentNode = (INode<T>)failureAsync.Upstream; return true;
+            case Ast.DoOnFailure.CancellableAsync<T> failureCancellable:
+                continuations.Push(new DoOnFailureCancellableCont<T>(failureCancellable.AsyncAction));
+                currentNode = (INode<T>)failureCancellable.Upstream; return true;
+            case Ast.Validate.Sync<T> validateSync:
+                continuations.Push(new ValidateCont<T>(validateSync.Predicate, validateSync.ExceptionFactory));
+                currentNode = (INode<T>)validateSync.Upstream; return true;
+            case Ast.Validate.Async<T> validateAsync:
+                continuations.Push(new ValidateAsyncCont<T>(validateAsync.PredicateAsync, validateAsync.ExceptionFactory));
+                currentNode = (INode<T>)validateAsync.Upstream; return true;
+            case Ast.Validate.CancellableAsync<T> validateCancellable:
+                continuations.Push(new ValidateCancellableCont<T>(validateCancellable.PredicateCancellableAsync, validateCancellable.ExceptionFactory));
+                currentNode = (INode<T>)validateCancellable.Upstream; return true;
+            case Ast.Recover.Sync<T> recoverSync:
+                continuations.Push(new RecoverCont<T>(recoverSync.Recover));
+                currentNode = (INode<T>)recoverSync.Source; return true;
+            case Ast.Recover.Async<T> recoverAsync:
+                continuations.Push(new RecoverAsyncCont<T>(recoverAsync.Recover));
+                currentNode = (INode<T>)recoverAsync.Source; return true;
+            case Ast.Recover.CancellableAsync<T> recoverCancellable:
+                continuations.Push(new RecoverCancellableCont<T>((ex, ct) => recoverCancellable.Recover(ex, ct)));
+                currentNode = (INode<T>)recoverCancellable.Source; return true;
         }
         return false;
     }
 }
-

@@ -1,8 +1,8 @@
 namespace BahmanM.Flow.Execution.Planning.Select;
 
-internal static class SelectFusion
+internal static class MergeConsecutiveSelectOperations
 {
-    internal sealed class SelectPipeline<T>
+    internal sealed class SelectOperationSequence<T>
     {
         private readonly List<Func<T, T>> _syncSteps = new();
         private readonly List<Func<T, CancellationToken, ValueTask<T>>> _steps = new();
@@ -48,38 +48,38 @@ internal static class SelectFusion
         }
     }
 
-    internal static (Ast.INode<T> UpstreamNode, SelectPipeline<T> Pipeline) Build<T>(
+    internal static (Ast.INode<T> UpstreamNode, SelectOperationSequence<T> Sequence) MergeAdjacent<T>(
         IFlow<T> start,
         Flow.Operations.Select.Sync<T, T>? seedSync,
         Flow.Operations.Select.Async<T, T>? seedAsync,
         Flow.Operations.Select.CancellableAsync<T, T>? seedCanc)
     {
-        var pipe = new SelectPipeline<T>();
-        if (seedSync is not null) pipe.AddSync(x => seedSync(x));
-        if (seedAsync is not null) pipe.AddAsync(x => seedAsync(x));
-        if (seedCanc is not null) pipe.AddCancellable((x, ct) => seedCanc(x, ct));
+        var sequence = new SelectOperationSequence<T>();
+        if (seedSync is not null) sequence.AddSync(x => seedSync(x));
+        if (seedAsync is not null) sequence.AddAsync(x => seedAsync(x));
+        if (seedCanc is not null) sequence.AddCancellable((x, ct) => seedCanc(x, ct));
 
-        var upstream = start;
+        var upstreamFlow = start;
         while (true)
         {
-            switch (upstream)
+            switch (upstreamFlow)
             {
-                case Ast.Select.Sync<T, T> ss:
-                    pipe.AddSync(x => ss.Operation(x));
-                    upstream = ss.Upstream;
+                case Ast.Select.Sync<T, T> selectSync:
+                    sequence.AddSync(x => selectSync.Operation(x));
+                    upstreamFlow = selectSync.Upstream;
                     continue;
-                case Ast.Select.Async<T, T> sa:
-                    pipe.AddAsync(x => sa.Operation(x));
-                    upstream = sa.Upstream;
+                case Ast.Select.Async<T, T> selectAsync:
+                    sequence.AddAsync(x => selectAsync.Operation(x));
+                    upstreamFlow = selectAsync.Upstream;
                     continue;
-                case Ast.Select.CancellableAsync<T, T> sc:
-                    pipe.AddCancellable((x, ct) => sc.Operation(x, ct));
-                    upstream = sc.Upstream;
+                case Ast.Select.CancellableAsync<T, T> selectCancellable:
+                    sequence.AddCancellable((x, ct) => selectCancellable.Operation(x, ct));
+                    upstreamFlow = selectCancellable.Upstream;
                     continue;
             }
             break;
         }
 
-        return (upstream.AsNode(), pipe);
+        return (upstreamFlow.AsNode(), sequence);
     }
 }

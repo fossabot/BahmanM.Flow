@@ -13,73 +13,73 @@ internal static class Interpreter
 {
     internal static async Task<Outcome<T>> ExecuteAsync<T>(INode<T> root, Options options)
     {
-        var conts = new Stack<IContinuation<T>>();
-        var node = root;
-        object? outcome = null;
+        var continuations = new Stack<IContinuation<T>>();
+        var currentNode = root;
+        object? currentOutcome = null;
 
         while (true)
         {
-            while (node is not null)
+            while (currentNode is not null)
             {
                 // Composite (All/Any)
-                var composite = await ConcurrencyExecutor.TryHandleAsync(node, options);
-                if (composite is not null)
+                var compositeOutcome = await ConcurrencyExecutor.TryHandleAsync(currentNode, options);
+                if (compositeOutcome is not null)
                 {
-                    outcome = composite;
-                    node = null;
+                    currentOutcome = compositeOutcome;
+                    currentNode = null;
                     continue;
                 }
 
                 // Select/Chain planned frames
-                var planned = await FramePlanning.TryPlanAsync(node, conts, options);
-                if (planned.Handled)
+                var planResult = await FramePlanning.TryPlanAsync(currentNode, continuations, options);
+                if (planResult.Handled)
                 {
-                    node = planned.NextNode;
-                    if (planned.Outcome is not null)
+                    currentNode = planResult.NextNode;
+                    if (planResult.Outcome is not null)
                     {
-                        outcome = planned.Outcome;
-                        node = null;
+                        currentOutcome = planResult.Outcome;
+                        currentNode = null;
                     }
                     continue;
                 }
 
                 // Resource
-                var resource = ResourceScope.TryOpen(node, conts);
-                if (resource.Handled)
+                var resourceResult = ResourceScope.TryOpen(currentNode, continuations);
+                if (resourceResult.Handled)
                 {
-                    node = resource.NextNode;
-                    if (resource.Outcome is not null)
+                    currentNode = resourceResult.NextNode;
+                    if (resourceResult.Outcome is not null)
                     {
-                        outcome = resource.Outcome;
-                        node = null;
+                        currentOutcome = resourceResult.Outcome;
+                        currentNode = null;
                     }
                     continue;
                 }
 
                 // Leaves
-                var leaf = await PrimitiveExecutor.TryEvaluateAsync(node, options);
-                if (leaf is not null)
+                var primitiveOutcome = await PrimitiveExecutor.TryEvaluateAsync(currentNode, options);
+                if (primitiveOutcome is not null)
                 {
-                    outcome = leaf;
-                    node = null;
+                    currentOutcome = primitiveOutcome;
+                    currentNode = null;
                     continue;
                 }
 
                 // Push simple operator continuations
-                if (!OperatorContinuationFactory.TryPush(ref node, conts))
+                if (!OperatorContinuationFactory.TryPush(ref currentNode, continuations))
                 {
-                    throw new NotSupportedException($"Unsupported node type: {node.GetType().FullName}");
+                    throw new NotSupportedException($"Unsupported node type: {currentNode.GetType().FullName}");
                 }
             }
 
-            var unwind = await ContinuationUnwinder.UnwindAsync(conts, outcome!, options);
-            if (unwind.NextNode is not null)
+            var unwindState = await ContinuationUnwinder.UnwindAsync(continuations, currentOutcome!, options);
+            if (unwindState.NextNode is not null)
             {
-                node = unwind.NextNode;
-                outcome = null;
+                currentNode = unwindState.NextNode;
+                currentOutcome = null;
                 continue;
             }
-            return (Outcome<T>)unwind.FinalOutcome!;
+            return (Outcome<T>)unwindState.FinalOutcome!;
         }
     }
 }

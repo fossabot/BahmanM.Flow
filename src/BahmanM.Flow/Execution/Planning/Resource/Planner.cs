@@ -16,33 +16,33 @@ internal static class ResourcePlanner
 {
     private static readonly Type WithResourceDef = typeof(BahmanM.Flow.Ast.Resource.WithResource<,>);
 
-    internal static bool TryCreate<T>(INode<T> node, out IWithResourcePlan<T> plan)
+    internal static bool TryCreate<T>(INode<T> node, out IWithResourcePlan<T> resourcePlan)
     {
-        var t = node.GetType();
-        if (!t.IsGenericType || t.GetGenericTypeDefinition() != WithResourceDef)
+        var nodeType = node.GetType();
+        if (!nodeType.IsGenericType || nodeType.GetGenericTypeDefinition() != WithResourceDef)
         {
-            plan = null!;
+            resourcePlan = null!;
             return false;
         }
 
-        var args = t.GetGenericArguments();
-        var tResource = args[0];
-        var method = typeof(ResourcePlanner).GetMethod(nameof(CreateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tResource, typeof(T));
-        plan = (IWithResourcePlan<T>)gmethod.Invoke(null, [node])!;
+        var typeArguments = nodeType.GetGenericArguments();
+        var resourceType = typeArguments[0];
+        var dispatch = typeof(ResourcePlanner).GetMethod(nameof(CreateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(resourceType, typeof(T));
+        resourcePlan = (IWithResourcePlan<T>)genericMethod.Invoke(null, [node])!;
         return true;
     }
 
-    private static IWithResourcePlan<T> CreateGeneric<TResource, T>(BahmanM.Flow.Ast.Resource.WithResource<TResource, T> wr)
+    private static IWithResourcePlan<T> CreateGeneric<TResource, T>(BahmanM.Flow.Ast.Resource.WithResource<TResource, T> withResource)
         where TResource : IDisposable
-        => new Plan<TResource, T>(wr);
+        => new Plan<TResource, T>(withResource);
 
-    private sealed class Plan<TResource, T>(BahmanM.Flow.Ast.Resource.WithResource<TResource, T> wr) : IWithResourcePlan<T>
+    private sealed class Plan<TResource, T>(BahmanM.Flow.Ast.Resource.WithResource<TResource, T> withResource) : IWithResourcePlan<T>
         where TResource : IDisposable
     {
-        public IDisposable Acquire() => wr.Acquire();
+        public IDisposable Acquire() => withResource.Acquire();
 
-        public INode<T> Use(IDisposable resource) => (INode<T>)wr.Use((TResource)resource);
+        public INode<T> Use(IDisposable resource) => (INode<T>)withResource.Use((TResource)resource);
 
         public IContinuation<T> CreateDisposeCont(IDisposable resource) => new DisposeCont<TResource, T>((TResource)resource);
     }

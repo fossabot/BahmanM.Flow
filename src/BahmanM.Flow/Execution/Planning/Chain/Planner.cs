@@ -10,58 +10,58 @@ internal static class ChainPlanner
     private static readonly Type ChainAsyncDef = typeof(BahmanM.Flow.Ast.Chain.Async<,>);
     private static readonly Type ChainCancellableDef = typeof(BahmanM.Flow.Ast.Chain.CancellableAsync<,>);
 
-    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plan)
+    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plannedFrame)
     {
-        var t = node.GetType();
-        if (!t.IsGenericType)
+        var nodeType = node.GetType();
+        if (!nodeType.IsGenericType)
         {
-            plan = null!;
+            plannedFrame = null!;
             return false;
         }
 
-        var def = t.GetGenericTypeDefinition();
-        var args = t.GetGenericArguments();
-        var tIn = args[0];
+        var genericDefinition = nodeType.GetGenericTypeDefinition();
+        var typeArguments = nodeType.GetGenericArguments();
+        var inputType = typeArguments[0];
 
-        if (def == ChainSyncDef)
+        if (genericDefinition == ChainSyncDef)
         {
-            plan = PlanChainSync<TOut>(node, tIn);
+            plannedFrame = PlanChainSync<TOut>(node, inputType);
             return true;
         }
-        if (def == ChainAsyncDef)
+        if (genericDefinition == ChainAsyncDef)
         {
-            plan = PlanChainAsync<TOut>(node, tIn);
+            plannedFrame = PlanChainAsync<TOut>(node, inputType);
             return true;
         }
-        if (def == ChainCancellableDef)
+        if (genericDefinition == ChainCancellableDef)
         {
-            plan = PlanChainCancellable<TOut>(node, tIn);
+            plannedFrame = PlanChainCancellable<TOut>(node, inputType);
             return true;
         }
 
-        plan = null!;
+        plannedFrame = null!;
         return false;
     }
 
-    private static PlannedFrame<TOut> PlanChainSync<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanChainSync<TOut>(object node, Type inputType)
     {
-        var method = typeof(ChainPlanner).GetMethod(nameof(PlanChainSyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(ChainPlanner).GetMethod(nameof(PlanChainSyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
-    private static PlannedFrame<TOut> PlanChainAsync<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanChainAsync<TOut>(object node, Type inputType)
     {
-        var method = typeof(ChainPlanner).GetMethod(nameof(PlanChainAsyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(ChainPlanner).GetMethod(nameof(PlanChainAsyncGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
-    private static PlannedFrame<TOut> PlanChainCancellable<TOut>(object node, Type tIn)
+    private static PlannedFrame<TOut> PlanChainCancellable<TOut>(object node, Type inputType)
     {
-        var method = typeof(ChainPlanner).GetMethod(nameof(PlanChainCancellableGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gmethod = method.MakeGenericMethod(tIn, typeof(TOut));
-        return (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var dispatch = typeof(ChainPlanner).GetMethod(nameof(PlanChainCancellableGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var genericMethod = dispatch.MakeGenericMethod(inputType, typeof(TOut));
+        return (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
     }
 
     private static PlannedFrame<TOut> PlanChainSyncGeneric<TIn, TOut>(BahmanM.Flow.Ast.Chain.Sync<TIn, TOut> n)

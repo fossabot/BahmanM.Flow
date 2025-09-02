@@ -5,28 +5,27 @@ namespace BahmanM.Flow.Execution.Engine.Resource;
 
 internal static class ResourceScope
 {
-    internal static ResourceResult<T> TryOpen<T>(INode<T> node, Stack<IContinuation<T>> conts)
+    internal static ResourceResult<T> TryOpen<T>(INode<T> currentNode, Stack<IContinuation<T>> continuations)
     {
-        if (Execution.Planning.Resource.ResourcePlanner.TryCreate(node, out var wrPlan))
+        if (Execution.Planning.Resource.ResourcePlanner.TryCreate(currentNode, out var resourcePlan))
         {
             IDisposable resource;
-            try { resource = wrPlan.Acquire(); }
+            try { resource = resourcePlan.Acquire(); }
             catch (Exception ex) { return new ResourceResult<T>(true, null, Outcome.Failure<T>(ex)); }
 
-            var disposeCont = wrPlan.CreateDisposeCont(resource);
+            var disposeContinuation = resourcePlan.CreateDisposeCont(resource);
             try
             {
-                var next = wrPlan.Use(resource);
-                conts.Push(disposeCont);
-                return new ResourceResult<T>(true, next, null);
+                var nextNode = resourcePlan.Use(resource);
+                continuations.Push(disposeContinuation);
+                return new ResourceResult<T>(true, nextNode, null);
             }
             catch (Exception ex)
             {
-                conts.Push(disposeCont);
+                continuations.Push(disposeContinuation);
                 return new ResourceResult<T>(true, null, Outcome.Failure<T>(ex));
             }
         }
         return new ResourceResult<T>(false, null, null);
     }
 }
-

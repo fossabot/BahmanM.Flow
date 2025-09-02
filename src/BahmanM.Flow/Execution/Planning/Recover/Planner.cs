@@ -10,17 +10,17 @@ internal static class RecoverPlanner
     private static readonly Type AsyncDef = typeof(BahmanM.Flow.Ast.Recover.Async<>);
     private static readonly Type CancellableDef = typeof(BahmanM.Flow.Ast.Recover.CancellableAsync<>);
 
-    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plan)
+    internal static bool TryPlan<TOut>(INode<TOut> node, out PlannedFrame<TOut> plannedFrame)
     {
-        var t = node.GetType();
-        if (!t.IsGenericType)
+        var nodeType = node.GetType();
+        if (!nodeType.IsGenericType)
         {
-            plan = null!;
+            plannedFrame = null!;
             return false;
         }
 
-        var def = t.GetGenericTypeDefinition();
-        var method = def switch
+        var genericDefinition = nodeType.GetGenericTypeDefinition();
+        var dispatchMethod = genericDefinition switch
         {
             var d when d == SyncDef => typeof(RecoverPlanner).GetMethod(nameof(PlanSyncGeneric), BindingFlags.NonPublic | BindingFlags.Static),
             var d when d == AsyncDef => typeof(RecoverPlanner).GetMethod(nameof(PlanAsyncGeneric), BindingFlags.NonPublic | BindingFlags.Static),
@@ -28,14 +28,14 @@ internal static class RecoverPlanner
             _ => null
         };
 
-        if (method is null)
+        if (dispatchMethod is null)
         {
-            plan = null!;
+            plannedFrame = null!;
             return false;
         }
 
-        var gmethod = method.MakeGenericMethod(typeof(TOut));
-        plan = (PlannedFrame<TOut>)gmethod.Invoke(null, [node])!;
+        var genericMethod = dispatchMethod.MakeGenericMethod(typeof(TOut));
+        plannedFrame = (PlannedFrame<TOut>)genericMethod.Invoke(null, [node])!;
         return true;
     }
 

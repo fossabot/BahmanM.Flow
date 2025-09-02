@@ -6,22 +6,21 @@ namespace BahmanM.Flow.Execution.Engine.Planning;
 
 internal static class FramePlanning
 {
-    internal static async Task<PlanResult<T>> TryPlanAsync<T>(INode<T> node, Stack<IContinuation<T>> conts, Options options)
+    internal static async Task<PlanResult<T>> TryPlanAsync<T>(INode<T> currentNode, Stack<IContinuation<T>> continuations, Options options)
     {
-        if (NodePlanner.TryPlan(node, out var plan))
+        if (NodePlanner.TryPlan(currentNode, out var frame))
         {
-            conts.Push(plan.Continuation);
-            if (plan.UpstreamNode is not null)
+            continuations.Push(frame.Continuation);
+            if (frame.UpstreamNode is not null)
             {
-                return new PlanResult<T>(true, plan.UpstreamNode, null);
+                return new PlanResult<T>(true, frame.UpstreamNode, null);
             }
-            if (plan.EvaluateUpstream is not null)
+            if (frame.EvaluateUpstream is not null)
             {
-                var outcome = await plan.EvaluateUpstream(options);
+                var outcome = await frame.EvaluateUpstream(options);
                 return new PlanResult<T>(true, null, outcome);
             }
         }
         return new PlanResult<T>(false, null, null);
     }
 }
-
