@@ -3,7 +3,7 @@ using BahmanM.Flow.Ast;
 using BahmanM.Flow.Execution.Continuations;
 using BahmanM.Flow.Execution.Continuations.Resource;
 
-namespace BahmanM.Flow.Execution.Planning;
+namespace BahmanM.Flow.Execution.Planning.Resource;
 
 internal interface IWithResourcePlan<T>
 {
@@ -12,7 +12,7 @@ internal interface IWithResourcePlan<T>
     IContinuation<T> CreateDisposeCont(IDisposable resource);
 }
 
-internal static class WithResourcePlanner
+internal static class ResourcePlanner
 {
     private static readonly Type WithResourceDef = typeof(BahmanM.Flow.Ast.Resource.WithResource<,>);
 
@@ -27,9 +27,9 @@ internal static class WithResourcePlanner
 
         var args = t.GetGenericArguments();
         var tResource = args[0];
-        var method = typeof(WithResourcePlanner).GetMethod(nameof(CreateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
+        var method = typeof(ResourcePlanner).GetMethod(nameof(CreateGeneric), BindingFlags.NonPublic | BindingFlags.Static)!;
         var gmethod = method.MakeGenericMethod(tResource, typeof(T));
-        plan = (IWithResourcePlan<T>)gmethod.Invoke(null, new object[] { node })!;
+        plan = (IWithResourcePlan<T>)gmethod.Invoke(null, [node])!;
         return true;
     }
 

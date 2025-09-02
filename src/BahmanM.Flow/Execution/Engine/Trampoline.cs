@@ -54,7 +54,7 @@ internal static class Interpreter
                 }
 
                 // Handle WithResource via planner with cached typed delegates
-                if (WithResourcePlanner.TryCreate(node, out var wrPlan))
+                if (Planning.Resource.ResourcePlanner.TryCreate(node, out var wrPlan))
                 {
                     IDisposable resource;
                     try
