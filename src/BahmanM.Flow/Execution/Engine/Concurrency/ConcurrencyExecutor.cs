@@ -20,10 +20,11 @@ internal static class ConcurrencyExecutor
 
     private static async Task<Outcome<T>> EvaluateAllAsync<T>(INode<T> node, Options options)
     {
-        var t = node.GetType();
-        var elem = t.GetGenericArguments()[0];
-        var method = typeof(ConcurrencyExecutor).GetMethod(nameof(EvaluateAllGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(elem);
+        var nodeType = node.GetType();
+        var elementType = nodeType.GetGenericArguments()[0];
+        var method = typeof(ConcurrencyExecutor)
+            .GetMethod(nameof(EvaluateAllForElementType), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(elementType);
         var task = (Task<object>)method.Invoke(null, [node, options])!;
         var resultObj = await task;
         return (Outcome<T>)resultObj;
@@ -31,16 +32,17 @@ internal static class ConcurrencyExecutor
 
     private static async Task<Outcome<T>> EvaluateAnyAsync<T>(INode<T> node, Options options)
     {
-        var t = node.GetType();
-        var elem = t.GetGenericArguments()[0];
-        var method = typeof(ConcurrencyExecutor).GetMethod(nameof(EvaluateAnyGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(elem);
+        var nodeType = node.GetType();
+        var elementType = nodeType.GetGenericArguments()[0];
+        var method = typeof(ConcurrencyExecutor)
+            .GetMethod(nameof(EvaluateAnyForElementType), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(elementType);
         var task = (Task<object>)method.Invoke(null, [node, options])!;
         var resultObj = await task;
         return (Outcome<T>)resultObj;
     }
 
-    private static async Task<object> EvaluateAllGeneric<TElement>(Ast.Primitive.All<TElement> all, Options options)
+    private static async Task<object> EvaluateAllForElementType<TElement>(Ast.Primitive.All<TElement> all, Options options)
     {
         var tasks = all.Flows.Select(f => Interpreter.ExecuteAsync((INode<TElement>)f, options)).ToList();
         var outcomes = await Task.WhenAll(tasks);
@@ -52,7 +54,7 @@ internal static class ConcurrencyExecutor
         return Outcome.Success(outcomes.OfType<Success<TElement>>().Select(s => s.Value).ToArray());
     }
 
-    private static async Task<object> EvaluateAnyGeneric<TElement>(Ast.Primitive.Any<TElement> any, Options options)
+    private static async Task<object> EvaluateAnyForElementType<TElement>(Ast.Primitive.Any<TElement> any, Options options)
     {
         var tasks = any.Flows.Select(f => Interpreter.ExecuteAsync((INode<TElement>)f, options)).ToList();
         var outcome = await TryOperation.TryFindFirstSuccessfulFlow(tasks, []);

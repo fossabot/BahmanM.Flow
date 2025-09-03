@@ -16,8 +16,6 @@ internal static class TryOperation
 
         if (outcome is Success<T> success)
         {
-            // TODO: Cancel the remaining tasks. This requires passing a CancellationTokenSource through the engine.
-            // For now, we let them run to completion but ignore their results.
             return success;
         }
 

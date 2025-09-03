@@ -78,7 +78,6 @@ internal static class SelectPlanner
         Flow.Operations.Select.Async<TIn, TOut>? initialAsync,
         Flow.Operations.Select.CancellableAsync<TIn, TOut>? initialCanc)
     {
-        // Different type: no fusion; evaluate upstream and apply a single continuation.
         if (typeof(TIn) != typeof(TOut))
         {
             if (initialSync is not null)
@@ -101,13 +100,13 @@ internal static class SelectPlanner
     {
         var (upstreamNode, sequence) = MergeConsecutiveSelectOperations.MergeAdjacent(upstreamStart, initialSync, initialAsync, initialCanc);
 
-        if (sequence.UsesCancellation)
+        if (sequence.RequiresCancellationToken)
         {
             return new PlannedFrame<T>(upstreamNode, null,
                 new SelectCancellableCont<T, T>(async (value, ct) => await sequence.Run(value, ct)));
         }
 
-        if (sequence.UsesAsync)
+        if (sequence.RequiresAsynchronousExecution)
         {
             return new PlannedFrame<T>(upstreamNode, null,
                 new SelectAsyncCont<T, T>(async value => await sequence.Run(value, CancellationToken.None)));

@@ -21,7 +21,6 @@ internal static class Interpreter
         {
             while (currentNode is not null)
             {
-                // Composite (All/Any)
                 var compositeOutcome = await ConcurrencyExecutor.TryHandleAsync(currentNode, options);
                 if (compositeOutcome is not null)
                 {
@@ -30,7 +29,6 @@ internal static class Interpreter
                     continue;
                 }
 
-                // Select/Chain planned frames
                 var planResult = await FramePlanning.TryPlanAsync(currentNode, continuations, options);
                 if (planResult.Handled)
                 {
@@ -43,7 +41,6 @@ internal static class Interpreter
                     continue;
                 }
 
-                // Resource
                 var resourceResult = ResourceScope.TryOpen(currentNode, continuations);
                 if (resourceResult.Handled)
                 {
@@ -56,7 +53,6 @@ internal static class Interpreter
                     continue;
                 }
 
-                // Leaves
                 var primitiveOutcome = await PrimitiveExecutor.TryEvaluateAsync(currentNode, options);
                 if (primitiveOutcome is not null)
                 {
@@ -65,7 +61,6 @@ internal static class Interpreter
                     continue;
                 }
 
-                // Push simple operator continuations
                 if (!OperatorContinuationFactory.TryPush(ref currentNode, continuations))
                 {
                     throw new NotSupportedException($"Unsupported node type: {currentNode.GetType().FullName}");

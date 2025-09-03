@@ -6,8 +6,8 @@ internal static class MergeConsecutiveSelectOperations
     {
         private readonly List<Func<T, T>> _syncSteps = new();
         private readonly List<Func<T, CancellationToken, ValueTask<T>>> _steps = new();
-        public bool UsesAsync { get; private set; }
-        public bool UsesCancellation { get; private set; }
+        public bool RequiresAsynchronousExecution { get; private set; }
+        public bool RequiresCancellationToken { get; private set; }
 
         public void AddSync(Func<T, T> f)
         {
@@ -17,14 +17,14 @@ internal static class MergeConsecutiveSelectOperations
 
         public void AddAsync(Func<T, Task<T>> f)
         {
-            UsesAsync = true;
+            RequiresAsynchronousExecution = true;
             _steps.Add(async (x, _) => await f(x));
         }
 
         public void AddCancellable(Func<T, CancellationToken, Task<T>> f)
         {
-            UsesAsync = true;
-            UsesCancellation = true;
+            RequiresAsynchronousExecution = true;
+            RequiresCancellationToken = true;
             _steps.Add(async (x, ct) => await f(x, ct));
         }
 
